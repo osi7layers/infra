@@ -67,3 +67,12 @@ variable "node_disk_size_gb" {
   type    = number
   default = 30
 }
+
+variable "access_entries" {
+  description = "kubectl 권한을 줄 IAM 사용자 이름 -> EKS 액세스 정책(AmazonEKSClusterAdminPolicy 등)과 네임스페이스. namespaces가 비면 클러스터 전체"
+  type = map(object({
+    policy     = string
+    namespaces = optional(list(string), [])
+  }))
+  default = {}
+}

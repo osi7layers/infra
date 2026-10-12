@@ -139,3 +139,28 @@ resource "aws_eks_addon" "this" {
 
   depends_on = [aws_eks_node_group.this]
 }
+
+# ---------------------------------------------------------------- 팀원 kubectl 권한 (EKS Access Entry)
+# IAM 사용자는 terraform/iam-users가 만든다. 사용자가 없으면 Access Entry 생성이 실패하므로 iam-users를 먼저 apply한다.
+# 클러스터를 만든 사람(Terraform 실행자)은 bootstrap_cluster_creator_admin_permissions로 이미 관리자라 넣지 않는다.
+resource "aws_eks_access_entry" "this" {
+  for_each = var.access_entries
+
+  cluster_name  = aws_eks_cluster.this.name
+  principal_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/${each.key}"
+  type          = "STANDARD"
+}
+
+resource "aws_eks_access_policy_association" "this" {
+  for_each = var.access_entries
+
+  cluster_name  = aws_eks_cluster.this.name
+  principal_arn = aws_eks_access_entry.this[each.key].principal_arn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/${each.value.policy}"
+
+  # namespaces가 비어 있으면 클러스터 전체, 있으면 그 네임스페이스에만 적용
+  access_scope {
+    type       = length(each.value.namespaces) > 0 ? "namespace" : "cluster"
+    namespaces = length(each.value.namespaces) > 0 ? each.value.namespaces : null
+  }
+}
