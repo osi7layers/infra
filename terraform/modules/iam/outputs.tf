@@ -1,8 +1,3 @@
-output "node_instance_profile_name" {
-  description = "자체 설치형(EC2) 노드용 instance profile. EKS 관리형 노드 그룹은 node_role_arn을 사용하므로 현재는 쓰이지 않음"
-  value       = aws_iam_instance_profile.node.name
-}
-
 output "node_role_name" {
   value = aws_iam_role.node.name
 }

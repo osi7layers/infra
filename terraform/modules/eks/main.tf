@@ -35,6 +35,7 @@ resource "aws_cloudwatch_log_group" "cluster" {
 
 # ---------------------------------------------------------------- 클러스터
 resource "aws_eks_cluster" "this" {
+  #checkov:skip=CKV_AWS_339:checkov의 지원 버전 목록에 1.36이 아직 없어서 생긴 오탐. AWS 기준 표준 지원 중 (2027-08까지)
   name     = var.cluster_name
   version  = var.kubernetes_version
   role_arn = var.cluster_role_arn

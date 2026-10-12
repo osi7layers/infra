@@ -3,7 +3,7 @@
 #
 # 사용법 (terraform 폴더에서):
 #   ./scripts/check.sh           # AWS 자격 증명 없이 가능한 점검 (plan 제외)
-#   ./scripts/check.sh --plan    # plan까지 실행하고, plan 파일 기준으로 Checkov/Infracost 실행
+#   ./scripts/check.sh --plan    # S3 backend까지 init 후 plan 실행, Infracost는 plan 파일 기준 (Checkov는 항상 코드 기준)
 #
 # 필요한 도구: terraform, checkov (pip install checkov), infracost (+ `infracost auth login`)
 set -u
@@ -54,11 +54,12 @@ if [ "$WITH_PLAN" -eq 1 ]; then
   fi
 fi
 
+# checkov는 항상 코드 기준으로 검사한다. plan JSON에는 #checkov:skip 주석이 없어서 이미 예외 처리한 항목이 다시 실패로 나온다.
+run_step "checkov" checkov checkov --config-file .checkov.yaml
+
 if [ -n "$PLAN_JSON" ]; then
-  run_step "checkov (plan)" checkov checkov -f "$PLAN_JSON" --framework terraform_plan --compact --quiet --skip-download
   run_step "infracost (plan)" infracost infracost breakdown --path "$PLAN_JSON" --usage-file infracost-usage.yml
 else
-  run_step "checkov" checkov checkov --config-file .checkov.yaml
   run_step "infracost" infracost infracost breakdown --config-file infracost.yml
 fi
 
