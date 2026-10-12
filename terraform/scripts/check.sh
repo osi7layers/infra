@@ -36,7 +36,12 @@ run_step() {
 }
 
 run_step "terraform fmt" terraform terraform fmt -check -recursive
-run_step "terraform init" terraform terraform init -backend=false -input=false
+# plan은 S3의 state를 읽어야 해서 backend까지 초기화한다. 그 외 점검은 자격 증명 없이 돌도록 backend를 건너뛴다.
+if [ "$WITH_PLAN" -eq 1 ]; then
+  run_step "terraform init" terraform terraform init -input=false -backend-config=backend.hcl
+else
+  run_step "terraform init" terraform terraform init -backend=false -input=false
+fi
 run_step "terraform validate" terraform terraform validate
 
 PLAN_JSON=""
