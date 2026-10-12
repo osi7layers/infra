@@ -31,10 +31,6 @@ output "ecr_repository_urls" {
   value       = module.ecr.repository_urls
 }
 
-output "node_instance_profile_name" {
-  value = module.iam.node_instance_profile_name
-}
-
 output "ci_user_name" {
   value = module.iam.ci_user_name
 }

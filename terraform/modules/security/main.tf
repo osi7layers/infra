@@ -6,6 +6,7 @@ locals {
 # (ALB SG <-> Node SG가 서로를 참조해서 인라인 규칙을 쓰면 순환 참조가 생김)
 
 resource "aws_security_group" "alb" {
+  #checkov:skip=CKV2_AWS_5:ALB는 코드가 아니라 AWS Load Balancer Controller가 만들면서 이 SG를 붙임
   name        = "${local.name}-alb-sg"
   description = "ALB: allow web traffic from the internet"
   vpc_id      = var.vpc_id
@@ -14,14 +15,16 @@ resource "aws_security_group" "alb" {
 }
 
 resource "aws_security_group" "node" {
+  #checkov:skip=CKV2_AWS_5:eks 모듈의 시작 템플릿에 붙어 있으나 checkov가 모듈 경계를 넘어 추적하지 못함
   name        = "${local.name}-node-sg"
-  description = "Kubernetes EC2 nodes: allow traffic from ALB, other nodes and on-prem VPN"
+  description = "EKS nodes: allow traffic from ALB and other nodes"
   vpc_id      = var.vpc_id
 
   tags = { Name = "${local.name}-node-sg" }
 }
 
 resource "aws_security_group" "db" {
+  #checkov:skip=CKV2_AWS_5:RDS 모듈이 아직 없음. RDS에 붙인 뒤 이 skip을 지울 것
   name        = "${local.name}-db-sg"
   description = "RDS: allow DB port from nodes and on-prem VPN only"
   vpc_id      = var.vpc_id
@@ -76,23 +79,9 @@ resource "aws_vpc_security_group_ingress_rule" "node_self" {
   referenced_security_group_id = aws_security_group.node.id
 }
 
-resource "aws_vpc_security_group_ingress_rule" "node_k8s_api_from_onprem" {
-  security_group_id = aws_security_group.node.id
-  description       = "Kubernetes API from on-prem over VPN"
-  ip_protocol       = "tcp"
-  from_port         = 6443
-  to_port           = 6443
-  cidr_ipv4         = var.onprem_cidr
-}
-
-resource "aws_vpc_security_group_ingress_rule" "node_ssh_from_onprem" {
-  security_group_id = aws_security_group.node.id
-  description       = "SSH from on-prem over VPN"
-  ip_protocol       = "tcp"
-  from_port         = 22
-  to_port           = 22
-  cidr_ipv4         = var.onprem_cidr
-}
+# 온프레미스에서 노드로 들어오는 규칙은 두지 않는다.
+# - K8s API는 노드가 아니라 EKS 컨트롤 플레인에 있다 (온프레미스 접근은 vpn 모듈에서 클러스터 SG 443으로 연다)
+# - 노드에는 SSH 키가 없다. 노드 접속이 필요하면 SSM Session Manager를 쓴다
 
 # 노드는 NAT를 통해 이미지 pull, 패키지 설치 등 외부 통신이 필요하다
 resource "aws_vpc_security_group_egress_rule" "node_all" {

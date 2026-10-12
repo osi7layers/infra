@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------- 쿠버네티스 노드(EC2) 역할
-# 노드가 ECR에서 이미지를 Pull 할 수 있게 한다. compute 모듈이 instance profile을 사용한다.
+# EKS 관리형 노드 그룹이 이 역할을 쓴다 (eks 모듈의 node_role_arn). 노드 등록, VPC CNI, ECR Pull 권한을 준다.
 data "aws_iam_policy_document" "ec2_assume" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -37,11 +37,6 @@ resource "aws_iam_role_policy_attachment" "node_eks_cni" {
 resource "aws_iam_role_policy_attachment" "node_ecr_pull_only" {
   role       = aws_iam_role.node.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPullOnly"
-}
-
-resource "aws_iam_instance_profile" "node" {
-  name = "${var.project}-node-profile"
-  role = aws_iam_role.node.name
 }
 
 # ---------------------------------------------------------------- Jenkins의 ECR Push 권한

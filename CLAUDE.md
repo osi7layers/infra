@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cd terraform
 terraform init -backend-config=backend.hcl   # 처음 한 번. state는 S3에 있음
 ./scripts/check.sh           # fmt -check -> init -backend=false -> validate -> checkov -> infracost (AWS 자격 증명 불필요)
-./scripts/check.sh --plan    # backend까지 init 후 plan, plan JSON 기준으로 checkov/infracost 실행
+./scripts/check.sh --plan    # backend까지 init 후 plan, infracost는 plan JSON 기준 (checkov는 항상 코드 기준)
 terraform fmt -recursive     # 포맷 자동 수정
 checkov                      # 정적 보안 검사 (.checkov.yaml을 읽음)
 infracost breakdown --config-file infracost.yml   # 비용 추산 (infracost-usage.yml의 사용량 가정 사용)
@@ -31,7 +31,7 @@ state는 S3 버킷(`osi7-tfstate-<계정ID>`)의 `aws/terraform.tfstate`에 있�
 루트 `main.tf`가 `terraform/modules/` 아래 모듈 5개를 연결한다. 모듈 사이의 값은 모듈 출력으로만 주고받는다.
 
 - **network**: VPC와 3계층 × AZ 2개 서브넷 (public / private app / private DB). public·app 서브넷에는 AWS Load Balancer Controller가 쓰는 `kubernetes.io/role/(internal-)elb` 태그가 붙어 있다. NAT 개수는 `nat_gateway_count`(1 또는 2)로 정한다. app 라우트 테이블은 `min(index, count-1)`로 NAT를 고르므로, NAT가 1개면 두 AZ가 같은 NAT를 쓴다. DB 서브넷에는 인터넷 경로가 없다.
-- **security**: ALB / 노드 / DB 보안 그룹. ALB SG와 노드 SG가 서로를 참조하므로, 인라인 규칙 대신 `aws_vpc_security_group_*_rule` 리소스로 규칙을 따로 붙인다 (인라인으로 쓰면 순환 참조가 생긴다). 온프레미스 접근(SSH, 6443, DB 포트, 복제용 egress)은 `onprem_cidr`로만 허용한다.
+- **security**: ALB / 노드 / DB 보안 그룹. ALB SG와 노드 SG가 서로를 참조하므로, 인라인 규칙 대신 `aws_vpc_security_group_*_rule` 리소스로 규칙을 따로 붙인다 (인라인으로 쓰면 순환 참조가 생긴다). 온프레미스 접근은 DB 포트와 복제용 egress만 `onprem_cidr`로 허용한다. 노드로 들어오는 온프레미스 규칙(SSH, 6443)은 일부러 두지 않았다. K8s API는 EKS 컨트롤 플레인에 있고, 노드 접속은 SSM으로 한다.
 - **ecr**: `ecr_repositories`의 이름마다 `<ecr_namespace>/<이름>` 리포지토리를 만든다. namespace는 온프레미스 Harbor 프로젝트 이름과 같게 둔다. **iam** 모듈이 쓰는 pull/push IAM 정책도 이 모듈에서 만든다.
 - **iam**: 노드 역할(EKS worker + CNI + osi-shop ECR pull + AWS 관리형 `AmazonEC2ContainerRegistryPullOnly`), EKS 클러스터 역할, 그리고 선택 사항인 Jenkins용 IAM 사용자를 만든다. Jenkins 사용자는 그룹을 통해 push 권한을 받는다. 액세스 키는 state에 비밀이 남지 않도록 Terraform이 아니라 콘솔에서 발급한다.
 - **eks**: app 서브넷에 클러스터를 만든다. Secrets는 KMS로 암호화하고, 컨트롤 플레인 로그는 모든 종류를 남기며, 인증 모드는 `API_AND_CONFIG_MAP`이다. 공개 엔드포인트는 `eks_public_access_cidrs`가 비어 있지 않을 때만 켜진다. 관리형 노드 그룹은 시작 템플릿으로 IMDSv2와 hop limit 1을 강제해 파드가 노드 권한을 쓰지 못하게 한다 (파드 권한은 Pod Identity/IRSA로 부여). EBS는 암호화된 gp3를 쓴다. 노드 그룹은 `desired_size` 변경을 무시하고, 애드온은 노드 그룹이 생긴 뒤에 설치한다.
