@@ -57,10 +57,12 @@ resource "aws_eks_cluster" "this" {
     }
   }
 
-  # aws-auth ConfigMap과 Access Entry 둘 다 허용. 생성한 사람은 자동으로 관리자
+  # aws-auth ConfigMap과 Access Entry 둘 다 허용.
+  # 생성한 사람(Terraform 실행자)에게 자동으로 관리자를 주지 않고, 관리자도 access_entries에 명시한다.
+  # (자동 부여와 Access Entry가 같은 사용자로 겹치면 생성이 실패하고, 누가 apply했는지에 따라 권한이 달라지지 않게 하려고)
   access_config {
     authentication_mode                         = "API_AND_CONFIG_MAP"
-    bootstrap_cluster_creator_admin_permissions = true
+    bootstrap_cluster_creator_admin_permissions = false
   }
 
   depends_on = [aws_cloudwatch_log_group.cluster]
@@ -142,7 +144,7 @@ resource "aws_eks_addon" "this" {
 
 # ---------------------------------------------------------------- 팀원 kubectl 권한 (EKS Access Entry)
 # IAM 사용자는 terraform/iam-users가 만든다. 사용자가 없으면 Access Entry 생성이 실패하므로 iam-users를 먼저 apply한다.
-# 클러스터를 만든 사람(Terraform 실행자)은 bootstrap_cluster_creator_admin_permissions로 이미 관리자라 넣지 않는다.
+# 클러스터 관리자(명호)도 여기서 준다. 클러스터 생성자 자동 관리자는 꺼 두었다 (access_config 참고).
 resource "aws_eks_access_entry" "this" {
   for_each = var.access_entries
 

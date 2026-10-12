@@ -145,6 +145,7 @@ variable "eks_access_entries" {
     namespaces = optional(list(string), [])
   }))
   default = {
+    myungho    = { policy = "AmazonEKSClusterAdminPolicy" }
     yechan     = { policy = "AmazonEKSClusterAdminPolicy" }
     jieun      = { policy = "AmazonEKSAdminPolicy", namespaces = ["argocd", "ecommerce"] }
     hongseop   = { policy = "AmazonEKSAdminPolicy", namespaces = ["monitoring"] }

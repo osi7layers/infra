@@ -28,9 +28,9 @@ state는 S3 버킷(`osi7-tfstate-<계정ID>`)의 `aws/terraform.tfstate`에 있�
 
 ### 팀원 IAM (`terraform/iam-users/`)
 
-팀원 IAM 사용자와 역할별 그룹(infra-admin, network, k8s-operator, cicd, observability, readonly, qa-k6)은 별도 루트 `terraform/iam-users/`가 만든다. 같은 버킷의 `iam-users/terraform.tfstate`를 써서, 메인을 destroy해도 팀원 계정은 남는다. 그 폴더에서 `terraform init -backend-config=backend.hcl` 후 apply하고, 팀원은 `users` 변수(사용자 이름 -> 그룹 목록)로 관리한다. 권한은 그룹에만 붙이고, 모든 그룹에 자기 자격 증명 관리 + 콘솔 MFA 강제 정책(`self-mfa`)이 붙는다. 이 정책은 `Bool` 조건이라 MFA 없는 콘솔만 막고 액세스 키(CLI)는 막지 않는다. 콘솔 비밀번호와 액세스 키는 콘솔에서 발급한다. 명호(Terraform 실행자, 지금 계정에서는 `sesac_cho`)는 EKS 클러스터 생성자라 `users`와 `eks_access_entries`에 넣지 않는다.
+팀원 IAM 사용자와 역할별 그룹(infra-admin, network, k8s-operator, cicd, observability, readonly, qa-k6)은 별도 루트 `terraform/iam-users/`가 만든다. 같은 버킷의 `iam-users/terraform.tfstate`를 써서, 메인을 destroy해도 팀원 계정은 남는다. 그 폴더에서 `terraform init -backend-config=backend.hcl` 후 apply하고, 팀원은 `users` 변수(사용자 이름 -> 그룹 목록)로 관리한다. 권한은 그룹에만 붙이고, 모든 그룹에 자기 자격 증명 관리 + 콘솔 MFA 강제 정책(`self-mfa`)이 붙는다. 이 정책은 `Bool` 조건이라 MFA 없는 콘솔만 막고 액세스 키(CLI)는 막지 않는다. 콘솔 비밀번호와 액세스 키는 콘솔에서 발급한다. 루트 계정은 프로젝트에 쓰지 않고, Terraform은 `myungho`(infra-admin)로 실행한다. 처음 한 번만 기존 관리자 사용자로 iam-users를 apply해 `myungho`를 만들고, 그 뒤로는 `myungho`의 액세스 키를 쓴다.
 
-kubectl 권한은 메인의 `eks_access_entries`(같은 사용자 이름 -> EKS 액세스 정책, 네임스페이스)가 eks 모듈의 Access Entry로 만든다. EKS는 없는 IAM 사용자로 Access Entry를 만들 수 없으므로 iam-users를 먼저 apply한다.
+kubectl 권한은 메인의 `eks_access_entries`(같은 사용자 이름 -> EKS 액세스 정책, 네임스페이스)가 eks 모듈의 Access Entry로 만든다. EKS는 없는 IAM 사용자로 Access Entry를 만들 수 없으므로 iam-users를 먼저 apply한다. 클러스터 생성자 자동 관리자(`bootstrap_cluster_creator_admin_permissions`)는 꺼 두었으므로 클러스터 관리자도 이 변수에 명시한다.
 
 ## 구조
 

@@ -43,9 +43,10 @@ eks_node_min_size       = 2
 eks_node_max_size       = 4
 
 # 팀원 kubectl 권한. 사용자는 terraform/iam-users가 만들므로 iam-users를 먼저 apply한다.
-# 명호(클러스터 생성자)는 자동으로 관리자라 넣지 않는다.
+# 클러스터 생성자에게 자동으로 관리자를 주지 않으므로 명호도 여기 넣는다.
 # 홍섭: kube-prometheus-stack 설치 때만 AmazonEKSClusterAdminPolicy(namespaces 없이)로 바꿔 apply하고, 설치 후 되돌린다
 eks_access_entries = {
+  myungho    = { policy = "AmazonEKSClusterAdminPolicy" }                                # 명호: IaC
   yechan     = { policy = "AmazonEKSClusterAdminPolicy" }                                # 예찬: KEDA, Metrics Server, Argo Rollouts가 클러스터 단위 설치
   jieun      = { policy = "AmazonEKSAdminPolicy", namespaces = ["argocd", "ecommerce"] } # 지은: CI/CD
   hongseop   = { policy = "AmazonEKSAdminPolicy", namespaces = ["monitoring"] }          # 홍섭: 관측성

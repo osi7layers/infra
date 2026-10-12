@@ -18,12 +18,12 @@ variable "ecr_namespace" {
 
 # 키는 IAM 사용자 이름. 메인의 eks_access_entries도 같은 이름을 쓴다.
 # 그룹: infra-admin, network, k8s-operator, cicd, observability, readonly, qa-k6
-# 명호(IaC)는 지금 계정에서 기존 사용자(sesac_cho)로 Terraform을 실행하고 EKS 클러스터 생성자라서 여기 넣지 않는다.
-# 팀 계정으로 옮기면 명호 사용자를 infra-admin으로 추가한다.
+# 루트 계정은 프로젝트에 쓰지 않는다. Terraform도 myungho(infra-admin)의 액세스 키로 실행한다.
 variable "users" {
   description = "팀원 IAM 사용자 이름 -> 소속 그룹 목록"
   type        = map(list(string))
   default = {
+    myungho    = ["infra-admin"]       # 명호: IaC (Terraform 실행)
     kwangryeol = ["network"]           # 광렬: 네트워크(VPN, Route 53)
     yechan     = ["k8s-operator"]      # 예찬: 워크로드/스케일링
     jieun      = ["cicd"]              # 지은: CI/CD
