@@ -71,13 +71,13 @@ variable "node_service_port_to" {
 }
 
 variable "ecr_repositories" {
-  description = "ECR 리포지토리 이름 목록 (샘플 앱의 서비스 13개 + 프론트엔드 2개)"
+  description = "ECR 리포지토리 이름 목록 (서비스 13개 + 프론트엔드 1개). 이름은 Harbor 리포지토리 이름과 맞춘다"
   type        = list(string)
   default = [
     "auth-service", "favourite-service", "inventory-service", "media-service",
     "notification-service", "order-service", "payment-service", "product-service",
     "promotion-service", "rating-service", "search-service", "shipping-service",
-    "tax-service", "frontend-web", "frontend-admin",
+    "tax-service", "frontend",
   ]
 }
 
@@ -88,9 +88,9 @@ variable "ecr_image_tag_mutability" {
 }
 
 variable "ecr_keep_image_count" {
-  description = "리포지토리마다 보관할 최근 이미지 수"
+  description = "리포지토리마다 보관할 최근 이미지 수 (push 순서 기준). 롤백할 버전은 최근 10번 push 안에 있어야 함"
   type        = number
-  default     = 30
+  default     = 10
 }
 
 variable "ecr_force_delete" {

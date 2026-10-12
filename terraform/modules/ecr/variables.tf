@@ -19,9 +19,9 @@ variable "image_tag_mutability" {
 }
 
 variable "keep_image_count" {
-  description = "리포지토리마다 보관할 최근 이미지 수 (초과분은 자동 삭제해 저장 비용 절감)"
+  description = "리포지토리마다 보관할 최근 이미지 수 (push 순서 기준, 초과분은 자동 삭제해 저장 비용 절감). 롤백할 버전은 이 범위 안에 있어야 함"
   type        = number
-  default     = 30
+  default     = 10
 }
 
 variable "force_delete" {
