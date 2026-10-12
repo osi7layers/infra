@@ -23,14 +23,15 @@ node_service_port_to   = 32767
 
 # ECR (Harbor와 환경별로 분리. AWS 환경은 ECR 사용)
 ecr_namespace = "osi-shop" # Harbor 프로젝트 이름과 동일 (CI/CD 설계안 기준)
+# 프론트엔드는 리포지토리 1개. 이름은 Harbor 쪽(광렬님)과 맞출 것
 ecr_repositories = [
   "auth-service", "favourite-service", "inventory-service", "media-service",
   "notification-service", "order-service", "payment-service", "product-service",
   "promotion-service", "rating-service", "search-service", "shipping-service",
-  "tax-service", "frontend-web", "frontend-admin",
+  "tax-service", "frontend",
 ]
 ecr_image_tag_mutability = "IMMUTABLE"
-ecr_keep_image_count     = 30
+ecr_keep_image_count     = 10 # push 순서 기준. 롤백할 버전은 최근 10번 안에 있어야 함
 ecr_force_delete         = true
 
 # EKS (AWS 쿠버네티스는 EKS로 확정)
