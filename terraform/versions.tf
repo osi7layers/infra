@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.6.0"
+  required_version = ">= 1.10.0" # backend의 use_lockfile(S3 잠금)이 1.10부터 지원
 
   required_providers {
     aws = {

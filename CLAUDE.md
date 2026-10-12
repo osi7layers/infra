@@ -10,14 +10,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 cd terraform
+terraform init -backend-config=backend.hcl   # 처음 한 번. state는 S3에 있음
 ./scripts/check.sh           # fmt -check -> init -backend=false -> validate -> checkov -> infracost (AWS 자격 증명 불필요)
-./scripts/check.sh --plan    # plan까지 실행하고, plan JSON 기준으로 checkov/infracost 실행
+./scripts/check.sh --plan    # backend까지 init 후 plan, plan JSON 기준으로 checkov/infracost 실행
 terraform fmt -recursive     # 포맷 자동 수정
 checkov                      # 정적 보안 검사 (.checkov.yaml을 읽음)
 infracost breakdown --config-file infracost.yml   # 비용 추산 (infracost-usage.yml의 사용량 가정 사용)
 ```
 
-`check.sh`는 설치되지 않은 도구를 실패로 처리하지 않고 건너뛰므로, 마지막 요약에서 건너뛴 항목을 확인한다. 원격 백엔드가 설정되어 있지 않아 state는 로컬에 저장된다 (gitignore 대상).
+`check.sh`는 설치되지 않은 도구를 실패로 처리하지 않고 건너뛰므로, 마지막 요약에서 건너뛴 항목을 확인한다.
+
+### 원격 state
+
+state는 S3 버킷(`osi7-tfstate-<계정ID>`)의 `aws/terraform.tfstate`에 있고, `use_lockfile`(S3 잠금 파일)로 동시 apply를 막는다. DynamoDB는 쓰지 않는다. `backend.tf`의 `backend "s3" {}`는 일부러 비워 두었고 (backend 블록에는 변수를 쓸 수 없음), 계정마다 다른 값은 `backend.hcl`에 있다.
+
+버킷은 `terraform/bootstrap/`이 만든다. bootstrap은 별도의 Terraform 루트로, state를 로컬에 두고 계정마다 한 번만 apply한다. 버킷에는 `prevent_destroy`가 걸려 있다. 다른 계정으로 옮길 때는 그 계정에서 bootstrap을 apply한 뒤, 출력값 `state_bucket_name`으로 `backend.hcl`의 `bucket`을 바꾸고 `terraform init -backend-config=backend.hcl -reconfigure`를 한다 (기존 state를 옮길 거라면 `-migrate-state`).
 
 ## 구조
 
@@ -26,7 +33,7 @@ infracost breakdown --config-file infracost.yml   # 비용 추산 (infracost-usa
 - **network**: VPC와 3계층 × AZ 2개 서브넷 (public / private app / private DB). public·app 서브넷에는 AWS Load Balancer Controller가 쓰는 `kubernetes.io/role/(internal-)elb` 태그가 붙어 있다. NAT 개수는 `nat_gateway_count`(1 또는 2)로 정한다. app 라우트 테이블은 `min(index, count-1)`로 NAT를 고르므로, NAT가 1개면 두 AZ가 같은 NAT를 쓴다. DB 서브넷에는 인터넷 경로가 없다.
 - **security**: ALB / 노드 / DB 보안 그룹. ALB SG와 노드 SG가 서로를 참조하므로, 인라인 규칙 대신 `aws_vpc_security_group_*_rule` 리소스로 규칙을 따로 붙인다 (인라인으로 쓰면 순환 참조가 생긴다). 온프레미스 접근(SSH, 6443, DB 포트, 복제용 egress)은 `onprem_cidr`로만 허용한다.
 - **ecr**: `ecr_repositories`의 이름마다 `<ecr_namespace>/<이름>` 리포지토리를 만든다. namespace는 온프레미스 Harbor 프로젝트 이름과 같게 둔다. **iam** 모듈이 쓰는 pull/push IAM 정책도 이 모듈에서 만든다.
-- **iam**: 노드 역할(EKS worker + CNI + ECR pull), EKS 클러스터 역할, 그리고 선택 사항인 Jenkins용 IAM 사용자를 만든다. Jenkins 사용자는 그룹을 통해 push 권한을 받는다. 액세스 키는 state에 비밀이 남지 않도록 Terraform이 아니라 콘솔에서 발급한다.
+- **iam**: 노드 역할(EKS worker + CNI + osi-shop ECR pull + AWS 관리형 `AmazonEC2ContainerRegistryPullOnly`), EKS 클러스터 역할, 그리고 선택 사항인 Jenkins용 IAM 사용자를 만든다. Jenkins 사용자는 그룹을 통해 push 권한을 받는다. 액세스 키는 state에 비밀이 남지 않도록 Terraform이 아니라 콘솔에서 발급한다.
 - **eks**: app 서브넷에 클러스터를 만든다. Secrets는 KMS로 암호화하고, 컨트롤 플레인 로그는 모든 종류를 남기며, 인증 모드는 `API_AND_CONFIG_MAP`이다. 공개 엔드포인트는 `eks_public_access_cidrs`가 비어 있지 않을 때만 켜진다. 관리형 노드 그룹은 시작 템플릿으로 IMDSv2와 hop limit 1을 강제해 파드가 노드 권한을 쓰지 못하게 한다 (파드 권한은 Pod Identity/IRSA로 부여). EBS는 암호화된 gp3를 쓴다. 노드 그룹은 `desired_size` 변경을 무시하고, 애드온은 노드 그룹이 생긴 뒤에 설치한다.
 
 주석에 나오는 `vpn` 모듈은 아직 없다. 앞으로 만들 예정이며, `app_route_table_ids` / `db_route_table_id`에 VGW 경로 전파를 설정하는 역할이다.
