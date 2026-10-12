@@ -32,6 +32,13 @@ resource "aws_iam_role_policy_attachment" "node_eks_cni" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
 }
 
+# EKS 시스템 이미지(aws-node, kube-proxy, coredns)는 AWS 소유 ECR에 있어서 위의 osi-shop 전용 Pull 정책으로는 받을 수 없다.
+# 이 정책이 없으면 VPC CNI가 뜨지 못해 노드가 NotReady로 남는다 (NodeCreationFailure).
+resource "aws_iam_role_policy_attachment" "node_ecr_pull_only" {
+  role       = aws_iam_role.node.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPullOnly"
+}
+
 resource "aws_iam_instance_profile" "node" {
   name = "${var.project}-node-profile"
   role = aws_iam_role.node.name
