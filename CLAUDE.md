@@ -24,11 +24,25 @@ infracost breakdown --config-file infracost.yml   # 비용 추산 (infracost-usa
 
 state는 S3 버킷(`osi7-tfstate-<계정ID>`)의 `aws/terraform.tfstate`에 있고, `use_lockfile`(S3 잠금 파일)로 동시 apply를 막는다. DynamoDB는 쓰지 않는다. `backend.tf`의 `backend "s3" {}`는 일부러 비워 두었고 (backend 블록에는 변수를 쓸 수 없음), 계정마다 다른 값은 `backend.hcl`에 있다.
 
-버킷은 `terraform/bootstrap/`이 만든다. bootstrap은 별도의 Terraform 루트로, state를 로컬에 두고 계정마다 한 번만 apply한다. 버킷에는 `prevent_destroy`가 걸려 있다. 다른 계정으로 옮길 때는 그 계정에서 bootstrap을 apply한 뒤, 출력값 `state_bucket_name`으로 `backend.hcl`의 `bucket`을 바꾸고 `terraform init -backend-config=backend.hcl -reconfigure`를 한다 (기존 state를 옮길 거라면 `-migrate-state`).
+버킷은 `terraform/bootstrap/`이 만든다. bootstrap은 별도의 Terraform 루트로, state를 로컬에 두고 계정마다 한 번만 apply한다. 버킷에는 `prevent_destroy`가 걸려 있다. 버킷 이름은 `terraform/backend.hcl`과 `terraform/iam-users/backend.hcl` 두 곳에 있다. 다른 계정으로 옮길 때는 두 파일의 `bucket`을 bootstrap 출력값 `state_bucket_name`으로 바꾸고 `terraform init -backend-config=backend.hcl -reconfigure`를 한다 (기존 state를 옮길 거라면 `-migrate-state`).
+
+지금 설정된 계정(`918633123181`, IAM 사용자 `sesac_cho`)은 테스트용이고, 실제 적용은 다른 계정에서 한다. 계정 ID는 코드에 적지 않고 `aws_caller_identity`로 읽으므로, 계정마다 바뀌는 곳은 위의 `backend.hcl` 두 개뿐이다.
+
+### 새 계정에서 처음 적용하기
+
+루트 계정은 처음 관리자 한 명을 만드는 데만 쓰고, 나머지는 모두 `myungho`로 한다.
+
+1. 루트로 콘솔에 로그인해 루트 MFA를 켠다. 루트 액세스 키는 만들지 않는다.
+2. 콘솔에서 IAM 사용자 `myungho`를 직접 만들고 `AdministratorAccess`를 임시로 붙인다. 이후 작업은 `aws login --profile myungho`로 로그인해서 한다.
+3. `terraform/bootstrap`에서 `terraform init` → `terraform apply`로 state 버킷을 만든다.
+4. `terraform/backend.hcl`, `terraform/iam-users/backend.hcl`의 `bucket`을 새 버킷 이름으로 바꾼다.
+5. `terraform/iam-users`에서 `terraform init -backend-config=backend.hcl -reconfigure` 후, 콘솔에서 만든 사용자를 가져온다: `terraform import 'aws_iam_user.this["myungho"]' myungho`. 그다음 apply하면 그룹, 정책, 팀원이 만들어지고 `myungho`가 infra-admin 그룹에 들어간다.
+6. 콘솔에서 `myungho`에 직접 붙였던 `AdministratorAccess`를 뗀다 (이제 그룹 권한을 받는다). 팀원 콘솔 비밀번호를 발급한다.
+7. `terraform/`에서 `terraform init -backend-config=backend.hcl -reconfigure` 후 apply한다. 유료 플랜 계정이면 `eks_node_instance_types`를 실제 사양으로 바꾼다.
 
 ### 팀원 IAM (`terraform/iam-users/`)
 
-팀원 IAM 사용자와 역할별 그룹(infra-admin, network, k8s-operator, cicd, observability, readonly, qa-k6)은 별도 루트 `terraform/iam-users/`가 만든다. 같은 버킷의 `iam-users/terraform.tfstate`를 써서, 메인을 destroy해도 팀원 계정은 남는다. 그 폴더에서 `terraform init -backend-config=backend.hcl` 후 apply하고, 팀원은 `users` 변수(사용자 이름 -> 그룹 목록)로 관리한다. 권한은 그룹에만 붙이고, 모든 그룹에 자기 자격 증명 관리 + 콘솔 MFA 강제 정책(`self-mfa`)이 붙는다. 이 정책은 `Bool` 조건이라 MFA 없는 콘솔만 막고 액세스 키(CLI)는 막지 않는다. 콘솔 비밀번호와 액세스 키는 콘솔에서 발급한다. 루트 계정은 프로젝트에 쓰지 않고, Terraform은 `myungho`(infra-admin)로 실행한다. 처음 한 번만 기존 관리자 사용자로 iam-users를 apply해 `myungho`를 만들고, 그 뒤로는 `myungho`의 액세스 키를 쓴다.
+팀원 IAM 사용자와 역할별 그룹(infra-admin, network, k8s-operator, cicd, observability, readonly, qa-k6)은 별도 루트 `terraform/iam-users/`가 만든다. 같은 버킷의 `iam-users/terraform.tfstate`를 써서, 메인을 destroy해도 팀원 계정은 남는다. 그 폴더에서 `terraform init -backend-config=backend.hcl` 후 apply하고, 팀원은 `users` 변수(사용자 이름 -> 그룹 목록)로 관리한다. 권한은 그룹에만 붙이고, 모든 그룹에 자기 자격 증명 관리 + 콘솔 MFA 강제 정책(`self-mfa`)이 붙는다. 이 정책은 `Bool` 조건이라 MFA 없는 콘솔만 막고 액세스 키(CLI)는 막지 않는다. 콘솔 비밀번호와 액세스 키는 콘솔에서 발급한다. 루트 계정은 프로젝트에 쓰지 않고, Terraform은 `myungho`(infra-admin)로 실행한다. `myungho`는 처음에 콘솔에서 만들어 import한다 (위 "새 계정에서 처음 적용하기").
 
 kubectl 권한은 메인의 `eks_access_entries`(같은 사용자 이름 -> EKS 액세스 정책, 네임스페이스)가 eks 모듈의 Access Entry로 만든다. EKS는 없는 IAM 사용자로 Access Entry를 만들 수 없으므로 iam-users를 먼저 apply한다. 클러스터 생성자 자동 관리자(`bootstrap_cluster_creator_admin_permissions`)는 꺼 두었으므로 클러스터 관리자도 이 변수에 명시한다.
 
