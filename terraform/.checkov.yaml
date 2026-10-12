@@ -1,0 +1,13 @@
+# Checkov 설정. terraform 폴더에서 `checkov` 만 실행하면 이 파일을 읽는다.
+framework:
+  - terraform
+directory:
+  - .
+compact: true
+quiet: true
+# 외부 가이드라인 서버 접속을 시도하지 않는다 (오프라인에서도 동일하게 동작)
+skip-download: true
+download-external-modules: false
+
+# 검사를 건너뛸 항목은 여기가 아니라 코드의 #checkov:skip=ID:사유 주석으로 남긴다.
+# (사유가 코드 옆에 있어야 나중에 왜 건너뛰었는지 알 수 있다)

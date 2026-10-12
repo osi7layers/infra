@@ -1,0 +1,8 @@
+# Infracost 사용량 가정. 고정 요금 외에 사용량에 따라 붙는 비용을 추산할 때 쓴다.
+# 값은 모두 가정이므로 k6 부하 테스트 결과를 보고 고칠 것.
+version: 0.1
+
+resource_type_default_usage:
+  aws_nat_gateway:
+    # NAT Gateway를 지나는 월간 데이터 처리량 (GB). 이미지 pull, 패키지 설치, 외부 API 호출 등
+    monthly_data_processed_gb: 100
