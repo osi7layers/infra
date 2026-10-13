@@ -33,16 +33,16 @@ state는 S3 버킷(`osi7-tfstate-<계정ID>`)의 `aws/terraform.tfstate`에 있�
 루트 계정은 처음 관리자 한 명을 만드는 데만 쓰고, 나머지는 모두 `myungho`로 한다.
 
 1. 루트로 콘솔에 로그인해 루트 MFA를 켠다. 루트 액세스 키는 만들지 않는다.
-2. 콘솔에서 IAM 사용자 `myungho`를 직접 만들고 `AdministratorAccess`를 임시로 붙인다. 이후 작업은 `aws login --profile myungho`로 로그인해서 한다.
+2. 콘솔에서 IAM 사용자 `myungho`를 직접 만들고 `AdministratorAccess`를 임시로 붙인다. 이후 작업은 `aws login --profile myungho`로 로그인해서 한다. Terraform은 `login_session`을 직접 읽지 못하므로, `~/.aws/config`에 `credential_process = aws configure export-credentials --profile myungho --format process`를 쓰는 프로필을 따로 만들어 `AWS_PROFILE`로 지정한다.
 3. `terraform/bootstrap`에서 `terraform init` → `terraform apply`로 state 버킷을 만든다.
 4. `terraform/backend.hcl`, `terraform/iam-users/backend.hcl`의 `bucket`을 새 버킷 이름으로 바꾼다.
-5. `terraform/iam-users`에서 `terraform init -backend-config=backend.hcl -reconfigure` 후, 콘솔에서 만든 사용자를 가져온다: `terraform import 'aws_iam_user.this["myungho"]' myungho`. 그다음 apply하면 그룹, 정책, 팀원이 만들어지고 `myungho`가 infra-admin 그룹에 들어간다.
+5. `terraform/iam-users`에서 `terraform init -backend-config=backend.hcl -reconfigure` 후, 콘솔에서 만든 사용자를 가져온다: `terraform import 'aws_iam_user.this["myungho"]' myungho`. 그다음 apply하면 (`!` 프롬프트가 아니라 별도 터미널에서 해야 yes 확인을 입력할 수 있다) 그룹, 정책, 팀원이 만들어지고 `myungho`가 infra-admin 그룹에 들어간다.
 6. 콘솔에서 `myungho`에 직접 붙였던 `AdministratorAccess`를 뗀다 (이제 그룹 권한을 받는다). 팀원 콘솔 비밀번호를 발급한다.
 7. `terraform/`에서 `terraform init -backend-config=backend.hcl -reconfigure` 후 apply한다. 유료 플랜 계정이면 `eks_node_instance_types`를 실제 사양으로 바꾼다.
 
 ### 팀원 IAM (`terraform/iam-users/`)
 
-팀원 IAM 사용자와 역할별 그룹(infra-admin, network, k8s-operator, cicd, observability, readonly, qa-k6)은 별도 루트 `terraform/iam-users/`가 만든다. 같은 버킷의 `iam-users/terraform.tfstate`를 써서, 메인을 destroy해도 팀원 계정은 남는다. 그 폴더에서 `terraform init -backend-config=backend.hcl` 후 apply하고, 팀원은 `users` 변수(사용자 이름 -> 그룹 목록)로 관리한다. 권한은 그룹에만 붙이고, 모든 그룹에 자기 자격 증명 관리 + 콘솔 MFA 강제 정책(`self-mfa`)이 붙는다. 이 정책은 `Bool` 조건이라 MFA 없는 콘솔만 막고 액세스 키(CLI)는 막지 않는다. 콘솔 비밀번호와 액세스 키는 콘솔에서 발급한다. 루트 계정은 프로젝트에 쓰지 않고, Terraform은 `myungho`(infra-admin)로 실행한다. `myungho`는 처음에 콘솔에서 만들어 import한다 (위 "새 계정에서 처음 적용하기").
+팀원 IAM 사용자와 역할별 그룹(infra-admin, network, k8s-operator, cicd, observability, readonly, qa-k6)은 별도 루트 `terraform/iam-users/`가 만든다. 같은 버킷의 `iam-users/terraform.tfstate`를 써서, 메인을 destroy해도 팀원 계정은 남는다. 그 폴더에서 `terraform init -backend-config=backend.hcl` 후 apply하고, 팀원은 `users` 변수(사용자 이름 -> 그룹 목록)로 관리한다. 권한은 그룹에만 붙이고, 모든 그룹에 자기 비밀번호·MFA·액세스 키 관리 정책(`self-mfa`)이 붙는다. MFA 등록은 팀 규칙이고 정책으로 강제하지 않는다. `aws login`으로 받은 CLI 세션은 콘솔에서 MFA로 로그인했어도 `aws:MultiFactorAuthPresent=false`로 표시되므로, "MFA 없으면 Deny" 문을 넣으면 Terraform을 포함한 모든 CLI가 막힌다 (테스트 계정에서 확인). 콘솔 비밀번호와 액세스 키는 콘솔에서 발급한다. 루트 계정은 프로젝트에 쓰지 않고, Terraform은 `myungho`(infra-admin)로 실행한다. `myungho`는 처음에 콘솔에서 만들어 import한다 (위 "새 계정에서 처음 적용하기").
 
 kubectl 권한은 메인의 `eks_access_entries`(같은 사용자 이름 -> EKS 액세스 정책, 네임스페이스)가 eks 모듈의 Access Entry로 만든다. EKS는 없는 IAM 사용자로 Access Entry를 만들 수 없으므로 iam-users를 먼저 apply한다. 클러스터 생성자 자동 관리자(`bootstrap_cluster_creator_admin_permissions`)는 꺼 두었으므로 클러스터 관리자도 이 변수에 명시한다.
 
