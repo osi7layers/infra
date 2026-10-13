@@ -46,6 +46,16 @@ state는 S3 버킷(`osi7-tfstate-<계정ID>`)의 `aws/terraform.tfstate`에 있�
 
 kubectl 권한은 메인의 `eks_access_entries`(같은 사용자 이름 -> EKS 액세스 정책, 네임스페이스)가 eks 모듈의 Access Entry로 만든다. EKS는 없는 IAM 사용자로 Access Entry를 만들 수 없으므로 iam-users를 먼저 apply한다. 클러스터 생성자 자동 관리자(`bootstrap_cluster_creator_admin_permissions`)는 꺼 두었으므로 클러스터 관리자도 이 변수에 명시한다.
 
+### 도메인 (`terraform/dns/`)
+
+가비아에서 산 `osi7.shop` 전체를 Route 53에 위임한다. 별도 루트(`dns/terraform.tfstate`)로 둔 이유는 영역을 다시 만들면 네임서버 4개가 바뀌어 가비아 등록과 위임 대기를 다시 해야 하기 때문이며, 영역에는 `prevent_destroy`가 걸려 있다. 영역은 계정에 속하므로 실제 계정이 정해진 뒤 한 번만 만든다 (`dns/backend.hcl`의 `bucket`도 계정에 맞게 바꾼다).
+
+1. `terraform/dns`에서 apply → 출력 `name_servers` 4개를 가비아 도메인 관리의 **네임서버 설정**에 입력 (NS 레코드 추가가 아님).
+2. `nslookup -type=NS osi7.shop`에 awsdns 주소 4개가 나오면 위임 완료.
+3. `harbor_ip`(harbor-01의 Tailscale IP)를 넣고 apply하면 `harbor.osi7.shop` A 레코드가 생긴다. Tailscale IP라 tailnet 안의 기기(Jenkins, 온프레미스 K8s 노드)에서만 접속된다.
+
+Harbor 인증서(Let's Encrypt, DNS-01)는 첫 발급만 수동이다. 온프레미스 담당이 알려 주는 `_acme-challenge.harbor` TXT를 콘솔에서 넣고, 발급 후 지운다 (Terraform 코드에 없는 레코드라 apply가 건드리지 않는다). 그다음 `create_acme_user = true`로 apply해 자동 갱신용 사용자 `osi7-acme-harbor`를 만들고, 콘솔에서 액세스 키를 발급해 영역 ID(`zone_id` 출력)와 함께 전달한다. 이 사용자는 `acme_hosts`로 정한 `_acme-challenge.<호스트>.osi7.shop` TXT만 바꿀 수 있다. 인증서는 90일짜리이고 만료 30일 전에 갱신되므로, 첫 발급 후 60일 안에 자동화를 끝낸다.
+
 ## 구조
 
 루트 `main.tf`가 `terraform/modules/` 아래 모듈 5개를 연결한다. 모듈 사이의 값은 모듈 출력으로만 주고받는다.
