@@ -11,7 +11,7 @@ variable "project" {
 }
 
 variable "domain" {
-  description = "Route 53에 위임할 도메인. 가비아에서 이 도메인의 네임서버를 Route 53 값으로 바꾼다"
+  description = "Route 53에 위임한 도메인. 이 이름의 퍼블릭 호스팅 영역이 콘솔에서 먼저 만들어져 있어야 한다"
   type        = string
   default     = "osi7.shop"
 }
