@@ -60,7 +60,7 @@ resource "aws_iam_group" "this" {
 }
 
 resource "aws_iam_user" "this" {
-  #checkov:skip=CKV_AWS_273:학습 프로젝트라 IAM Identity Center(SSO) 대신 IAM 사용자 + 그룹 권한 + 콘솔 MFA 강제로 운영
+  #checkov:skip=CKV_AWS_273:학습 프로젝트라 IAM Identity Center(SSO) 대신 IAM 사용자 + 그룹 권한 + MFA 등록(팀 규칙)으로 운영
   for_each = var.users
 
   name          = each.key
@@ -84,7 +84,7 @@ resource "aws_iam_policy" "this" {
 
 # infra-admin은 Terraform이 VPC, EKS, IAM Role, ECR을 모두 만들어서 사실상 관리자 권한이 필요하다
 resource "aws_iam_group_policy_attachment" "infra_admin" {
-  #checkov:skip=CKV_AWS_274:IaC 담당이 VPC/EKS/IAM/ECR 전체를 Terraform으로 만들어 관리자 권한이 필요함. 콘솔은 MFA 강제
+  #checkov:skip=CKV_AWS_274:IaC 담당이 VPC/EKS/IAM/ECR 전체를 Terraform으로 만들어 관리자 권한이 필요함. MFA 등록 필수(팀 규칙)
   group      = aws_iam_group.this["infra-admin"].name
   policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
 }
@@ -103,11 +103,11 @@ resource "aws_iam_group_policy_attachment" "custom" {
   policy_arn = aws_iam_policy.this[each.value.policy].arn
 }
 
-# 모든 그룹: 자기 비밀번호/MFA/액세스 키 관리 + 콘솔 MFA 강제
+# 모든 그룹: 자기 비밀번호/MFA/액세스 키 관리
 resource "aws_iam_group_policy_attachment" "self_mfa" {
-  for_each = aws_iam_group.this
+  for_each = toset(local.groups) # 리소스가 아닌 고정 목록으로 반복해야 import 때도 키를 정할 수 있음
 
-  group      = each.value.name
+  group      = aws_iam_group.this[each.key].name
   policy_arn = aws_iam_policy.this["self-mfa"].arn
 }
 
@@ -185,9 +185,9 @@ data "aws_iam_policy_document" "k6_ec2" {
   }
 }
 
-# 자기 계정 관리 + 콘솔 MFA 강제 (AWS 문서의 Force_MFA 예시를 바탕으로 함)
-# 조건을 BoolIfExists가 아니라 Bool로 둬서, MFA 없이 로그인한 콘솔 세션만 막고 액세스 키(CLI)는 막지 않는다.
-# (액세스 키 요청에는 aws:MultiFactorAuthPresent 키가 아예 없어서 Bool 조건에 걸리지 않음)
+# 자기 비밀번호, MFA, 액세스 키를 스스로 관리하는 권한 (MFA 등록은 팀 규칙으로 하고 정책으로 강제하지 않는다).
+# MFA가 없으면 거부하는 Deny 문은 일부러 두지 않았다. aws login으로 받은 CLI 세션은 콘솔에서 MFA로 로그인했어도
+# aws:MultiFactorAuthPresent=false로 표시되어, Deny가 있으면 Terraform을 포함한 모든 CLI 작업이 막힌다 (테스트 계정에서 확인).
 data "aws_iam_policy_document" "self_mfa" {
   statement {
     sid       = "ViewAccountInfo"
@@ -207,22 +207,5 @@ data "aws_iam_policy_document" "self_mfa" {
       "arn:aws:iam::${local.account_id}:user/$${aws:username}",
       "arn:aws:iam::${local.account_id}:mfa/*",
     ]
-  }
-
-  statement {
-    sid    = "DenyConsoleWithoutMFA"
-    effect = "Deny"
-    not_actions = [
-      "iam:ChangePassword", "iam:GetUser", "iam:GetAccountPasswordPolicy",
-      "iam:ListMFADevices", "iam:ListVirtualMFADevices", "iam:EnableMFADevice",
-      "iam:ResyncMFADevice", "iam:CreateVirtualMFADevice", "sts:GetSessionToken",
-    ]
-    resources = ["*"]
-
-    condition {
-      test     = "Bool"
-      variable = "aws:MultiFactorAuthPresent"
-      values   = ["false"]
-    }
   }
 }
