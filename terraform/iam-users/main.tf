@@ -105,9 +105,9 @@ resource "aws_iam_group_policy_attachment" "custom" {
 
 # 모든 그룹: 자기 비밀번호/MFA/액세스 키 관리 + 콘솔 MFA 강제
 resource "aws_iam_group_policy_attachment" "self_mfa" {
-  for_each = aws_iam_group.this
+  for_each = toset(local.groups) # 리소스가 아닌 고정 목록으로 반복해야 import 때도 키를 정할 수 있음
 
-  group      = each.value.name
+  group      = aws_iam_group.this[each.key].name
   policy_arn = aws_iam_policy.this["self-mfa"].arn
 }
 
