@@ -32,7 +32,7 @@ VPC 콘솔 → "VPC 등"의 마법사를 쓰지 말고 하나씩 만든다 (각 
 - [ ] SG `osi7-alb-sg`(인바운드 80/443 0.0.0.0/0), `osi7-node-sg`(ALB SG에서 30000-32767, 자기 자신 전체). ALB SG 아웃바운드는 노드 SG 30000-32767만
 - [ ] ECR `osi-shop/frontend` (태그 변경 불가, 푸시할 때 스캔)
 - [ ] 화면 캡처를 남긴 뒤 **만든 반대 순서로 삭제** (ECR → SG 규칙 중 서로 참조하는 것 → SG → NAT 삭제(완료까지 대기) → EIP 해제 → 라우트 테이블 → 서브넷 → IGW 분리·삭제 → VPC)
-- [ ] `aws resourcegroupstaggingapi get-resources --tag-filters Key=ManagedBy,Values=console`이 비어 있는지 확인 (삭제 반영에 몇 분 걸릴 수 있음)
+- [ ] `aws resourcegroupstaggingapi get-resources --tag-filters Key=ManagedBy,Values=console`이 비어 있는지 확인 (삭제한 NAT는 한동안 남아 보이므로 NAT는 `describe-nat-gateways`의 상태가 `deleted`인지로 확인)
 
 ## 2~3. CLI 단계와 정리
 

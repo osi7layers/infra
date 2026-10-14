@@ -60,8 +60,12 @@ fi
 [ -n "${VPC_ID:-}" ] && try aws ec2 delete-vpc --vpc-id "$VPC_ID"
 
 step "남은 리소스 확인 (ManagedBy=cli 태그, 비어 있어야 함)"
+# 삭제한 NAT는 태그 검색에 한동안 남으므로 NAT는 빼고, 상태로 따로 확인한다
 left=$(awsq resourcegroupstaggingapi get-resources --tag-filters Key=ManagedBy,Values=cli \
-  --query 'ResourceTagMappingList[].ResourceARN' | tr '\t' '\n' | sed '/^$/d')
+  --query 'ResourceTagMappingList[].ResourceARN' | tr '\t' '\n' | sed '/^$/d' | grep -v ':natgateway/')
+left_nat=$(awsq ec2 describe-nat-gateways --filter Name=tag:ManagedBy,Values=cli \
+  --query 'NatGateways[?State!=`deleted`].NatGatewayId')
+left="$left$left_nat"
 left_iam=$(awsq iam list-roles --query "Roles[?RoleName=='$PROJECT-node-role'].RoleName")
 if [ -z "$left" ] && [ -z "$left_iam" ]; then
   echo "  남은 것 없음"
