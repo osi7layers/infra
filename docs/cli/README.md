@@ -22,7 +22,7 @@
 
 ## 1. 콘솔 단계 (체크리스트)
 
-VPC 콘솔 → "VPC 등"의 마법사를 쓰지 말고 하나씩 만든다 (각 리소스의 관계를 보려고).
+VPC 콘솔 → "VPC 등"의 마법사를 쓰지 말고 하나씩 만든다 (각 리소스의 관계를 보려고). 만드는 것마다 태그 `Project=osi7`, `ManagedBy=console`을 붙인다 (정리 후 남은 것을 태그로 찾으려고).
 
 - [ ] VPC `osi7-vpc` 10.20.0.0/16, DNS 확인·DNS 호스트 이름 켜기
 - [ ] 서브넷 `osi7-public-a` 10.20.0.0/24 (2a), `osi7-public-c` 10.20.1.0/24 (2c), `osi7-app-a` 10.20.10.0/24 (2a), `osi7-app-c` 10.20.11.0/24 (2c)
@@ -31,7 +31,8 @@ VPC 콘솔 → "VPC 등"의 마법사를 쓰지 말고 하나씩 만든다 (각 
 - [ ] 라우트 테이블 `osi7-rt-public`(0.0.0.0/0 → IGW, public 서브넷 2개 연결), `osi7-rt-app-a`·`osi7-rt-app-c`(0.0.0.0/0 → NAT, 각 app 서브넷 연결)
 - [ ] SG `osi7-alb-sg`(인바운드 80/443 0.0.0.0/0), `osi7-node-sg`(ALB SG에서 30000-32767, 자기 자신 전체). ALB SG 아웃바운드는 노드 SG 30000-32767만
 - [ ] ECR `osi-shop/frontend` (태그 변경 불가, 푸시할 때 스캔)
-- [ ] 화면 캡처를 남긴 뒤 **만든 반대 순서로 삭제** (NAT 삭제 → EIP 해제 → 라우트 테이블 → 서브넷 → IGW 분리·삭제 → VPC)
+- [ ] 화면 캡처를 남긴 뒤 **만든 반대 순서로 삭제** (ECR → SG 규칙 중 서로 참조하는 것 → SG → NAT 삭제(완료까지 대기) → EIP 해제 → 라우트 테이블 → 서브넷 → IGW 분리·삭제 → VPC)
+- [ ] `aws resourcegroupstaggingapi get-resources --tag-filters Key=ManagedBy,Values=console`이 비어 있는지 확인 (삭제 반영에 몇 분 걸릴 수 있음)
 
 ## 2~3. CLI 단계와 정리
 
