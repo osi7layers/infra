@@ -14,6 +14,8 @@ vpc=$(awsq ec2 describe-vpcs --filters Name=tag:Name,Values="$PROJECT-vpc" --que
 [ "$(awsq ec2 describe-vpcs --filters Name=tag:Name,Values="$PROJECT-vpc" --query 'length(Vpcs)')" = "1" ] \
   || { echo "$PROJECT-vpc가 두 개 이상입니다. CLI로 만든 것을 먼저 정리하세요"; exit 1; }
 
+echo "수집 중... aws 호출이 많아 2~3분 걸리고, 끝나야 결과가 한꺼번에 나온다"
+
 # SG ID -> 이름 (규칙이 다른 SG를 참조할 때 ID 대신 이름으로 보이게)
 declare -A sgname
 while read -r id name; do sgname[$id]=$name; done < <(awsq ec2 describe-security-groups \
