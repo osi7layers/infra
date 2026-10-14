@@ -73,6 +73,8 @@ Harbor 인증서(Let's Encrypt, DNS-01)는 첫 발급만 수동이다. 온프레
 
 온프레미스 연결 방식(Site-to-Site VPN 또는 Tailscale 서브넷 라우터 등)은 아직 정해지지 않았다. 정해지면 그 모듈을 만들고, network의 `app_route_table_ids`에 온프레미스로 가는 경로를 넣는다. `onprem_cidr`는 그때까지 어디에도 쓰지 않는 임시값이다.
 
+`docs/cli/`는 멘토 권장 순서(콘솔 → CLI → 정리 → Terraform)의 기록이다. network·security·ECR 1개·노드 IAM 역할을 Terraform과 같은 이름으로 CLI 스크립트(`01`~`04`, `99-cleanup.sh`)로 만들고 지운 뒤, `snapshot.sh`로 CLI 결과와 Terraform 결과를 ID 없이 비교한다 (QA A-IAC-01). CLI로 만든 것은 `ManagedBy=cli` 태그로 구분한다. CLI 리소스와 메인 Terraform을 동시에 올리면 같은 이름의 VPC가 두 개 생기므로, 반드시 정리한 뒤 apply한다. Terraform 모듈의 이름·규칙을 바꾸면 이 스크립트도 같이 맞춘다.
+
 ## 규칙
 
 - 루트 변수는 `variables.tf`에 기본값과 함께 선언하고, 같은 값을 `terraform.tfvars`에도 적는다 (`terraform.tfvars`는 팀 엑셀 '변수' 시트와 대응). 값은 `terraform.tfvars`에서 수정하고, 변수를 추가할 때는 기본값도 함께 맞춘다. `onprem_cidr`, 노드 서비스 포트 범위, 노드 인스턴스 타입, k8s 버전 등은 팀원 확인을 기다리는 임시값이다.
