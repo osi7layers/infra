@@ -23,14 +23,8 @@ resource "aws_security_group" "node" {
   tags = { Name = "${local.name}-node-sg" }
 }
 
-resource "aws_security_group" "db" {
-  #checkov:skip=CKV2_AWS_5:RDS 모듈이 아직 없음. RDS에 붙인 뒤 이 skip을 지울 것
-  name        = "${local.name}-db-sg"
-  description = "RDS: allow DB port from nodes and on-prem VPN only"
-  vpc_id      = var.vpc_id
-
-  tags = { Name = "${local.name}-db-sg" }
-}
+# DB SG는 두지 않는다. DB(MySQL 8.4)는 온프레미스에서만 운영한다.
+# EKS 파드에서 온프레미스 DB로 나가는 연결은 node_all egress가 이미 허용하고, 경로는 온프레미스 연결 방식이 정해지면 추가한다.
 
 # ---------------------------------------------------------------- ALB SG
 resource "aws_vpc_security_group_ingress_rule" "alb_http" {
@@ -90,34 +84,4 @@ resource "aws_vpc_security_group_egress_rule" "node_all" {
   description       = "All outbound (via NAT)"
   ip_protocol       = "-1"
   cidr_ipv4         = "0.0.0.0/0"
-}
-
-# ---------------------------------------------------------------- DB SG
-resource "aws_vpc_security_group_ingress_rule" "db_from_node" {
-  security_group_id            = aws_security_group.db.id
-  description                  = "DB port from nodes"
-  ip_protocol                  = "tcp"
-  from_port                    = var.db_port
-  to_port                      = var.db_port
-  referenced_security_group_id = aws_security_group.node.id
-}
-
-resource "aws_vpc_security_group_ingress_rule" "db_from_onprem" {
-  security_group_id = aws_security_group.db.id
-  description       = "DB port from on-prem over VPN (migration, replication)"
-  ip_protocol       = "tcp"
-  from_port         = var.db_port
-  to_port           = var.db_port
-  cidr_ipv4         = var.onprem_cidr
-}
-
-# RDS를 온프레미스 MySQL의 복제본으로 둘 경우 RDS가 온프레미스 소스에 접속하므로 온프레미스로만 열어 둔다.
-# 복제 방향이 확정되어 필요 없으면 이 규칙을 지운다.
-resource "aws_vpc_security_group_egress_rule" "db_to_onprem" {
-  security_group_id = aws_security_group.db.id
-  description       = "DB port to on-prem over VPN (replication)"
-  ip_protocol       = "tcp"
-  from_port         = var.db_port
-  to_port           = var.db_port
-  cidr_ipv4         = var.onprem_cidr
 }

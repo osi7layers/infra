@@ -47,15 +47,7 @@ resource "aws_subnet" "app" {
   tags = { Name = "${local.name}-app-${substr(var.azs[count.index], -1, 1)}", Tier = "app", "kubernetes.io/role/internal-elb" = "1" }
 }
 
-resource "aws_subnet" "db" {
-  count = length(var.azs)
-
-  vpc_id            = aws_vpc.this.id
-  cidr_block        = var.db_subnet_cidrs[count.index]
-  availability_zone = var.azs[count.index]
-
-  tags = { Name = "${local.name}-db-${substr(var.azs[count.index], -1, 1)}", Tier = "db" }
-}
+# DB 서브넷은 두지 않는다. DB(MySQL 8.4)는 온프레미스에서만 운영하고, AWS에는 RDS도 백업 복제도 없다.
 
 # ---------------------------------------------------------------- NAT Gateway
 resource "aws_eip" "nat" {
@@ -120,19 +112,4 @@ resource "aws_route_table_association" "app" {
 
   subnet_id      = aws_subnet.app[count.index].id
   route_table_id = aws_route_table.app[count.index].id
-}
-
-# ---------------------------------------------------------------- 라우팅: Private DB
-# 인터넷 경로 없음. 온프레미스 경로는 vpn 모듈의 경로 전파(route propagation)로 추가된다.
-resource "aws_route_table" "db" {
-  vpc_id = aws_vpc.this.id
-
-  tags = { Name = "${local.name}-rt-db" }
-}
-
-resource "aws_route_table_association" "db" {
-  count = length(var.azs)
-
-  subnet_id      = aws_subnet.db[count.index].id
-  route_table_id = aws_route_table.db.id
 }
