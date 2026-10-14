@@ -54,15 +54,15 @@ done
 
 step "인터넷 게이트웨이 -> VPC (기본 SG와 기본 라우트 테이블은 VPC와 함께 지워짐)"
 if [ -n "${IGW_ID:-}" ]; then
-  try aws ec2 detach-internet-gateway --internet-gateway-id "$IGW_ID" --vpc-id "${VPC_ID:-}"
+  try aws ec2 detach-internet-gateway --vpc-id "${VPC_ID:-}" --internet-gateway-id "$IGW_ID"
   try aws ec2 delete-internet-gateway --internet-gateway-id "$IGW_ID"
 fi
 [ -n "${VPC_ID:-}" ] && try aws ec2 delete-vpc --vpc-id "$VPC_ID"
 
 step "남은 리소스 확인 (ManagedBy=cli 태그, 비어 있어야 함)"
-# 삭제한 NAT는 태그 검색에 한동안 남으므로 NAT는 빼고, 상태로 따로 확인한다
+# 태그 검색은 삭제 반영이 늦다. 삭제한 NAT와 VPC와 함께 지워진 기본 SG가 한동안 남아 보이므로 둘은 빼고, NAT는 상태로 따로 확인한다
 left=$(awsq resourcegroupstaggingapi get-resources --tag-filters Key=ManagedBy,Values=cli \
-  --query 'ResourceTagMappingList[].ResourceARN' | tr '\t' '\n' | sed '/^$/d' | grep -v ':natgateway/')
+  --query 'ResourceTagMappingList[].ResourceARN' | tr '\t' '\n' | sed '/^$/d' | grep -v ':natgateway/' | grep -v "security-group/${DEFAULT_SG_ID:-none}$")
 left_nat=$(awsq ec2 describe-nat-gateways --filter Name=tag:ManagedBy,Values=cli \
   --query 'NatGateways[?State!=`deleted`].NatGatewayId')
 left="$left$left_nat"
