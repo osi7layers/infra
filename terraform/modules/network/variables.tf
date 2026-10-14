@@ -18,10 +18,6 @@ variable "app_subnet_cidrs" {
   type = list(string)
 }
 
-variable "db_subnet_cidrs" {
-  type = list(string)
-}
-
 variable "nat_gateway_count" {
   description = "1 이상 AZ 개수 이하"
   type        = number

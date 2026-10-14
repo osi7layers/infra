@@ -10,20 +10,12 @@ output "app_subnet_ids" {
   value = module.network.app_subnet_ids
 }
 
-output "db_subnet_ids" {
-  value = module.network.db_subnet_ids
-}
-
 output "alb_sg_id" {
   value = module.security.alb_sg_id
 }
 
 output "node_sg_id" {
   value = module.security.node_sg_id
-}
-
-output "db_sg_id" {
-  value = module.security.db_sg_id
 }
 
 output "ecr_repository_urls" {

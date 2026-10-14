@@ -7,15 +7,13 @@ azs      = ["ap-northeast-2a", "ap-northeast-2c"]
 
 public_subnet_cidrs = ["10.20.0.0/24", "10.20.1.0/24"]
 app_subnet_cidrs    = ["10.20.10.0/24", "10.20.11.0/24"]
-db_subnet_cidrs     = ["10.20.20.0/24", "10.20.21.0/24"]
+# DB 서브넷 없음: DB(MySQL 8.4)는 온프레미스에서만 운영
 
 nat_gateway_count = 1
 
 # 온프레미스 대역은 임시값. 광렬님께 확인 후 수정 (VPC 대역과 겹치면 안 됨)
+# 지금은 쓰지 않음. 온프레미스 연결 방식(VPN/Tailscale)이 정해지면 경로와 SG에 사용
 onprem_cidr = "192.168.0.0/16"
-
-# MySQL 8.4 LTS
-db_port = 3306
 
 # ALB -> Node 서비스 포트. APISIX/Gateway 포트가 정해지면 좁힌다 (임시: NodePort 범위)
 node_service_port_from = 30000

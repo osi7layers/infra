@@ -34,12 +34,6 @@ variable "app_subnet_cidrs" {
   default     = ["10.20.10.0/24", "10.20.11.0/24"]
 }
 
-variable "db_subnet_cidrs" {
-  description = "Private DB 서브넷 CIDR (azs 순서와 동일)"
-  type        = list(string)
-  default     = ["10.20.20.0/24", "10.20.21.0/24"]
-}
-
 variable "nat_gateway_count" {
   description = "NAT Gateway 개수. 1이면 저렴하지만 단일 장애점, 2이면 AZ별 1개"
   type        = number
@@ -47,15 +41,9 @@ variable "nat_gateway_count" {
 }
 
 variable "onprem_cidr" {
-  description = "온프레미스 대역. 광렬님께 확인 후 확정 (임시값). VPC 대역과 겹치면 VPN 불가"
+  description = "온프레미스 대역 (임시값, 광렬님 확인 필요). 지금은 어디에도 쓰지 않으며, 온프레미스 연결 방식(VPN/Tailscale)이 정해지면 경로와 SG에 사용. VPC 대역과 겹치면 안 됨"
   type        = string
   default     = "192.168.0.0/16"
-}
-
-variable "db_port" {
-  description = "DB 접속 포트. MySQL 8.4 LTS 3306"
-  type        = number
-  default     = 3306
 }
 
 variable "node_service_port_from" {

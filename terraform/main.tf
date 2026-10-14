@@ -6,7 +6,6 @@ module "network" {
   azs                 = var.azs
   public_subnet_cidrs = var.public_subnet_cidrs
   app_subnet_cidrs    = var.app_subnet_cidrs
-  db_subnet_cidrs     = var.db_subnet_cidrs
   nat_gateway_count   = var.nat_gateway_count
 }
 
@@ -15,8 +14,6 @@ module "security" {
 
   project                = var.project
   vpc_id                 = module.network.vpc_id
-  onprem_cidr            = var.onprem_cidr
-  db_port                = var.db_port
   node_service_port_from = var.node_service_port_from
   node_service_port_to   = var.node_service_port_to
 }
