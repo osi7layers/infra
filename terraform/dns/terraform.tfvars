@@ -1,2 +1,5 @@
 # harbor-01의 Tailscale IP (온프레미스 담당 제공). tailnet 안의 기기에서만 접속된다
 harbor_ip = "100.85.182.121"
+
+# Harbor 인증서 자동 갱신용 사용자 (첫 발급은 2026-10-14 수동 TXT로 완료)
+create_acme_user = true
