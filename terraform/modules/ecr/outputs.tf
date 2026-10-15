@@ -7,10 +7,6 @@ output "pull_policy_arn" {
   value = aws_iam_policy.pull.arn
 }
 
-output "push_policy_arn" {
-  value = aws_iam_policy.push.arn
-}
-
 output "registry_url" {
   description = "docker login 대상, GitOps overlays/aws의 이미지 주소 앞부분"
   value       = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com"

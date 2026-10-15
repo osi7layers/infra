@@ -20,14 +20,9 @@ node_service_port_from = 30000
 node_service_port_to   = 32767
 
 # ECR (Harbor와 환경별로 분리. AWS 환경은 ECR 사용)
-ecr_namespace = "osi-shop" # Harbor 프로젝트 이름과 동일 (CI/CD 설계안 기준)
-# 프론트엔드는 리포지토리 1개. 이름은 Harbor 쪽(광렬님)과 맞출 것
-ecr_repositories = [
-  "auth-service", "favourite-service", "inventory-service", "media-service",
-  "notification-service", "order-service", "payment-service", "product-service",
-  "promotion-service", "rating-service", "search-service", "shipping-service",
-  "tax-service", "frontend",
-]
+ecr_namespace = "ecommerce" # Harbor 프로젝트 이름과 동일 (지은님 CI/CD 답변 기준)
+# Jenkins가 같은 이미지를 Harbor와 ECR에 같은 이름·태그로 push한다. web은 프론트엔드
+ecr_repositories         = ["auth", "product", "order", "promotion", "web"]
 ecr_image_tag_mutability = "IMMUTABLE"
 ecr_keep_image_count     = 10 # push 순서 기준. 롤백할 버전은 최근 10번 안에 있어야 함
 ecr_force_delete         = true
@@ -45,11 +40,14 @@ eks_node_max_size       = 4
 # 클러스터 생성자에게 자동으로 관리자를 주지 않으므로 명호도 여기 넣는다.
 # 홍섭: kube-prometheus-stack 설치 때만 AmazonEKSClusterAdminPolicy(namespaces 없이)로 바꿔 apply하고, 설치 후 되돌린다
 eks_access_entries = {
-  myungho    = { policy = "AmazonEKSClusterAdminPolicy" }                                # 명호: IaC
-  yechan     = { policy = "AmazonEKSClusterAdminPolicy" }                                # 예찬: KEDA, Metrics Server, Argo Rollouts가 클러스터 단위 설치
-  jieun      = { policy = "AmazonEKSAdminPolicy", namespaces = ["argocd", "ecommerce"] } # 지은: CI/CD
-  hongseop   = { policy = "AmazonEKSAdminPolicy", namespaces = ["monitoring"] }          # 홍섭: 관측성
-  kwangryeol = { policy = "AmazonEKSViewPolicy" }                                        # 광렬: 네트워크
-  jaehak     = { policy = "AmazonEKSViewPolicy" }                                        # 재학: QA
-  junho      = { policy = "AmazonEKSViewPolicy", namespaces = ["ecommerce"] }            # 준호: DB. 테스트 Pod가 필요하면 AmazonEKSEditPolicy
+  myungho    = { policy = "AmazonEKSClusterAdminPolicy" }                           # 명호: IaC
+  yechan     = { policy = "AmazonEKSClusterAdminPolicy" }                           # 예찬: KEDA, Metrics Server, Argo Rollouts가 클러스터 단위 설치
+  jieun      = { policy = "AmazonEKSAdminPolicy", namespaces = ["ecommerce-main"] } # 지은: CI/CD
+  hongseop   = { policy = "AmazonEKSAdminPolicy", namespaces = ["monitoring"] }     # 홍섭: 관측성
+  kwangryeol = { policy = "AmazonEKSViewPolicy" }                                   # 광렬: 네트워크
+  jaehak     = { policy = "AmazonEKSViewPolicy" }                                   # 재학: QA
+  junho      = { policy = "AmazonEKSViewPolicy", namespaces = ["ecommerce-main"] }  # 준호: DB. 테스트 Pod가 필요하면 AmazonEKSEditPolicy
+  # 온프레미스 ArgoCD가 EKS를 원격 클러스터(osi7-aws)로 등록해 쓰는 계정. 사용자는 iam-users가 만든다.
+  # ArgoCD 클러스터 시크릿의 namespaces도 ecommerce-main으로 맞춰야 한다 (권한이 그 네임스페이스에만 있음)
+  osi7-argocd = { policy = "AmazonEKSAdminPolicy", namespaces = ["ecommerce-main"] }
 }

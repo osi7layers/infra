@@ -8,14 +8,14 @@ aws iam create-role --role-name "$PROJECT-node-role" \
   --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}' \
   --tags Key=Project,Value="$PROJECT" Key=ManagedBy,Value=cli >/dev/null
 
-step "osi-shop 전용 Pull 정책 $PROJECT-ecr-pull"
+step "프로젝트 전용 Pull 정책 $PROJECT-ecr-pull"
 save ECR_PULL_POLICY_ARN "$(awsq iam create-policy --policy-name "$PROJECT-ecr-pull" --description "ECR image pull only" \
   --policy-document "{\"Version\":\"2012-10-17\",\"Statement\":[
     {\"Sid\":\"GetAuthorizationToken\",\"Effect\":\"Allow\",\"Action\":\"ecr:GetAuthorizationToken\",\"Resource\":\"*\"},
     {\"Sid\":\"PullImages\",\"Effect\":\"Allow\",\"Action\":[\"ecr:BatchCheckLayerAvailability\",\"ecr:BatchGetImage\",\"ecr:GetDownloadUrlForLayer\"],\"Resource\":\"$ECR_REPO_ARN\"}]}" \
   --tags Key=Project,Value="$PROJECT" Key=ManagedBy,Value=cli --query Policy.Arn)"
 
-step "정책 연결 (osi-shop Pull + EKS 노드 + CNI + AWS 관리형 ECR Pull)"
+step "정책 연결 (프로젝트 Pull + EKS 노드 + CNI + AWS 관리형 ECR Pull)"
 for arn in "$ECR_PULL_POLICY_ARN" \
   arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy \
   arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy \

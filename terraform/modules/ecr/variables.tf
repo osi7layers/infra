@@ -31,6 +31,6 @@ variable "force_delete" {
 }
 
 variable "namespace" {
-  description = "ECR 리포지토리 이름 접두사. Harbor 프로젝트 이름과 같게 둔다 (예: osi-shop -> osi-shop/frontend)"
+  description = "ECR 리포지토리 이름 접두사. Harbor 프로젝트 이름과 같게 둔다 (예: ecommerce -> ecommerce/web)"
   type        = string
 }

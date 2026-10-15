@@ -59,14 +59,9 @@ variable "node_service_port_to" {
 }
 
 variable "ecr_repositories" {
-  description = "ECR 리포지토리 이름 목록 (서비스 13개 + 프론트엔드 1개). 이름은 Harbor 리포지토리 이름과 맞춘다"
+  description = "ECR 리포지토리 이름 목록 (백엔드 4개 + 프론트엔드 web). 이름은 Harbor 리포지토리 이름과 맞춘다"
   type        = list(string)
-  default = [
-    "auth-service", "favourite-service", "inventory-service", "media-service",
-    "notification-service", "order-service", "payment-service", "product-service",
-    "promotion-service", "rating-service", "search-service", "shipping-service",
-    "tax-service", "frontend",
-  ]
+  default     = ["auth", "product", "order", "promotion", "web"]
 }
 
 variable "ecr_image_tag_mutability" {
@@ -88,9 +83,9 @@ variable "ecr_force_delete" {
 }
 
 variable "ecr_namespace" {
-  description = "ECR 리포지토리 이름 접두사. Harbor 프로젝트 이름과 동일하게 (CI/CD 설계안: osi-shop)"
+  description = "ECR 리포지토리 이름 접두사. Harbor 프로젝트 이름과 동일하게 (CI/CD: ecommerce)"
   type        = string
-  default     = "osi-shop"
+  default     = "ecommerce"
 }
 
 variable "eks_kubernetes_version" {
@@ -133,12 +128,13 @@ variable "eks_access_entries" {
     namespaces = optional(list(string), [])
   }))
   default = {
-    myungho    = { policy = "AmazonEKSClusterAdminPolicy" }
-    yechan     = { policy = "AmazonEKSClusterAdminPolicy" }
-    jieun      = { policy = "AmazonEKSAdminPolicy", namespaces = ["argocd", "ecommerce"] }
-    hongseop   = { policy = "AmazonEKSAdminPolicy", namespaces = ["monitoring"] }
-    kwangryeol = { policy = "AmazonEKSViewPolicy" }
-    jaehak     = { policy = "AmazonEKSViewPolicy" }
-    junho      = { policy = "AmazonEKSViewPolicy", namespaces = ["ecommerce"] }
+    myungho     = { policy = "AmazonEKSClusterAdminPolicy" }
+    yechan      = { policy = "AmazonEKSClusterAdminPolicy" }
+    jieun       = { policy = "AmazonEKSAdminPolicy", namespaces = ["ecommerce-main"] }
+    hongseop    = { policy = "AmazonEKSAdminPolicy", namespaces = ["monitoring"] }
+    kwangryeol  = { policy = "AmazonEKSViewPolicy" }
+    jaehak      = { policy = "AmazonEKSViewPolicy" }
+    junho       = { policy = "AmazonEKSViewPolicy", namespaces = ["ecommerce-main"] }
+    osi7-argocd = { policy = "AmazonEKSAdminPolicy", namespaces = ["ecommerce-main"] }
   }
 }

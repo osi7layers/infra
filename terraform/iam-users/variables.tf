@@ -13,7 +13,7 @@ variable "project" {
 variable "ecr_namespace" {
   description = "cicd 그룹이 push할 수 있는 ECR 리포지토리 접두사 (메인의 ecr_namespace와 같게)"
   type        = string
-  default     = "osi-shop"
+  default     = "ecommerce"
 }
 
 # 키는 IAM 사용자 이름. 메인의 eks_access_entries도 같은 이름을 쓴다.

@@ -46,6 +46,8 @@ AWS 자격 증명: 루트와 테스트용 `sesac_cho`는 쓰지 않는다 (sesac
 
 팀원 IAM 사용자와 역할별 그룹(infra-admin, network, k8s-operator, cicd, observability, readonly, qa-k6)은 별도 루트 `terraform/iam-users/`가 만든다. 같은 버킷의 `iam-users/terraform.tfstate`를 써서, 메인을 destroy해도 팀원 계정은 남는다. 그 폴더에서 `terraform init -backend-config=backend.hcl` 후 apply하고, 팀원은 `users` 변수(사용자 이름 -> 그룹 목록)로 관리한다. 권한은 그룹에만 붙이고, 모든 그룹에 자기 비밀번호·MFA·액세스 키 관리 정책(`self-mfa`)이 붙는다. MFA 등록은 팀 규칙이고 정책으로 강제하지 않는다. `aws login`으로 받은 CLI 세션은 콘솔에서 MFA로 로그인했어도 `aws:MultiFactorAuthPresent=false`로 표시되므로, "MFA 없으면 Deny" 문을 넣으면 Terraform을 포함한 모든 CLI가 막힌다 (이 계정에서 확인). 콘솔 비밀번호와 액세스 키는 콘솔에서 발급한다. 루트 계정은 프로젝트에 쓰지 않고, Terraform은 `myungho`(infra-admin)로 실행한다. `myungho`는 처음에 콘솔에서 만들어 import한다 (위 "새 계정에서 처음 적용하기").
 
+온프레미스 프로그램용 서비스 계정도 iam-users에 있다 (`local.service_users`, 팀원 그룹이 아니라서 self-mfa가 붙지 않음). `osi7-jenkins-ecr-push`는 같은 이미지를 Harbor와 ECR에 이중 push하고, `osi7-argocd`는 온프레미스 ArgoCD가 EKS를 원격 클러스터로 관리할 때 쓴다 (kubectl 권한은 메인의 Access Entry, `ecommerce-main` 네임스페이스만). ECR push 정책(`osi7-ecr-push`, `repository/<ecr_namespace>/*`)도 여기서 만들어 cicd 그룹과 Jenkins가 함께 쓴다. 메인에 두면 destroy 때마다 사용자와 키가 지워지기 때문이다. 액세스 키는 콘솔에서 발급해 CI/CD 담당에게 전달한다.
+
 kubectl 권한은 메인의 `eks_access_entries`(같은 사용자 이름 -> EKS 액세스 정책, 네임스페이스)가 eks 모듈의 Access Entry로 만든다. EKS는 없는 IAM 사용자로 Access Entry를 만들 수 없으므로 iam-users를 먼저 apply한다. 클러스터 생성자 자동 관리자(`bootstrap_cluster_creator_admin_permissions`)는 꺼 두었으므로 클러스터 관리자도 이 변수에 명시한다.
 
 ### 도메인 (`terraform/dns/`)
@@ -57,7 +59,7 @@ kubectl 권한은 메인의 `eks_access_entries`(같은 사용자 이름 -> EKS 
 3. `nslookup -type=NS osi7.shop`에 awsdns 주소 4개가 나오면 위임 완료.
 4. `harbor_ip`(harbor-01의 Tailscale IP)를 넣고 `terraform/dns`에서 apply하면 `harbor.osi7.shop` A 레코드가 생긴다. Tailscale IP라 tailnet 안의 기기(Jenkins, 온프레미스 K8s 노드)에서만 접속된다.
 
-Harbor 인증서(Let's Encrypt, DNS-01)는 첫 발급만 수동이다. 온프레미스 담당이 알려 주는 `_acme-challenge.harbor` TXT를 콘솔에서 넣고, 발급 후 지운다 (Terraform 코드에 없는 레코드라 apply가 건드리지 않는다). 그다음 `create_acme_user = true`로 apply해 자동 갱신용 사용자 `osi7-acme-harbor`를 만들고, 콘솔에서 액세스 키를 발급해 영역 ID(`zone_id` 출력)와 함께 전달한다. 이 사용자는 `acme_hosts`로 정한 `_acme-challenge.<호스트>.osi7.shop` TXT만 바꿀 수 있다. 인증서는 90일짜리이고 만료 30일 전에 갱신되므로, 첫 발급 후 60일 안에 자동화를 끝낸다.
+Harbor 인증서(Let's Encrypt, DNS-01)는 첫 발급만 수동이다. 온프레미스 담당이 알려 주는 `_acme-challenge.harbor` TXT를 콘솔에서 넣고, 발급 후 지운다 (Terraform 코드에 없는 레코드라 apply가 건드리지 않는다). 그다음 `create_acme_user = true`로 apply해 자동 갱신용 사용자 `osi7-acme-harbor`를 만들고, 콘솔에서 액세스 키를 발급해 영역 ID(`zone_id` 출력)와 함께 전달한다. 이 사용자는 `acme_hosts`(harbor, shop, api, keycloak — 온프레미스 쪽 인증서)로 정한 `_acme-challenge.<호스트>.osi7.shop` TXT만 바꿀 수 있다. 이름은 harbor지만 사용자를 다시 만들면 발급한 키가 무효가 되므로 이름은 그대로 둔다. 인증서는 90일짜리이고 만료 30일 전에 갱신되므로, 첫 발급 후 60일 안에 자동화를 끝낸다.
 
 ## 구조
 
@@ -65,8 +67,8 @@ Harbor 인증서(Let's Encrypt, DNS-01)는 첫 발급만 수동이다. 온프레
 
 - **network**: VPC와 2계층 × AZ 2개 서브넷 (public / private app). DB 서브넷은 없다 (DB는 온프레미스에서만 운영, 아래 참고). public·app 서브넷에는 AWS Load Balancer Controller가 쓰는 `kubernetes.io/role/(internal-)elb` 태그가 붙어 있다. NAT 개수는 `nat_gateway_count`(1 또는 2)로 정한다. app 라우트 테이블은 `min(index, count-1)`로 NAT를 고르므로, NAT가 1개면 두 AZ가 같은 NAT를 쓴다.
 - **security**: ALB / 노드 보안 그룹. ALB SG와 노드 SG가 서로를 참조하므로, 인라인 규칙 대신 `aws_vpc_security_group_*_rule` 리소스로 규칙을 따로 붙인다 (인라인으로 쓰면 순환 참조가 생긴다). 온프레미스 관련 규칙은 아직 없다 (연결 방식이 정해지면 추가). 노드로 들어오는 온프레미스 규칙(SSH, 6443)은 일부러 두지 않았다. K8s API는 EKS 컨트롤 플레인에 있고, 노드 접속은 SSM으로 한다.
-- **ecr**: `ecr_repositories`의 이름마다 `<ecr_namespace>/<이름>` 리포지토리를 만든다. namespace는 온프레미스 Harbor 프로젝트 이름과 같게 둔다. **iam** 모듈이 쓰는 pull/push IAM 정책도 이 모듈에서 만든다.
-- **iam**: 노드 역할(EKS worker + CNI + osi-shop ECR pull + AWS 관리형 `AmazonEC2ContainerRegistryPullOnly`), EKS 클러스터 역할, 그리고 선택 사항인 Jenkins용 IAM 사용자를 만든다. Jenkins 사용자는 그룹을 통해 push 권한을 받는다. 액세스 키는 state에 비밀이 남지 않도록 Terraform이 아니라 콘솔에서 발급한다.
+- **ecr**: `ecr_repositories`의 이름마다 `<ecr_namespace>/<이름>` 리포지토리를 만든다. 지금은 `ecommerce/` + auth, product, order, promotion, web이다. namespace는 온프레미스 Harbor 프로젝트 이름과 같게 둔다. 노드가 쓰는 pull 정책은 이 모듈에서 만들고, push 정책은 iam-users에 있다 (같은 이름 `osi7-ecr-push`를 두 곳에서 만들면 apply가 실패한다).
+- **iam**: 노드 역할(EKS worker + CNI + 프로젝트 ECR pull + AWS 관리형 `AmazonEC2ContainerRegistryPullOnly`)과 EKS 클러스터 역할을 만든다. Jenkins·ArgoCD 사용자는 iam-users에 있다.
 - **eks**: app 서브넷에 클러스터를 만든다. Secrets는 KMS로 암호화하고, 컨트롤 플레인 로그는 모든 종류를 남기며, 인증 모드는 `API_AND_CONFIG_MAP`이다. 공개 엔드포인트는 `eks_public_access_cidrs`가 비어 있지 않을 때만 켜진다. 관리형 노드 그룹은 시작 템플릿으로 IMDSv2와 hop limit 1을 강제해 파드가 노드 권한을 쓰지 못하게 한다 (파드 권한은 Pod Identity/IRSA로 부여). EBS는 암호화된 gp3를 쓴다. 노드 그룹은 `desired_size` 변경을 무시하고, 애드온은 노드 그룹이 생긴 뒤에 설치한다. 팀원 kubectl 권한은 `access_entries`로 Access Entry와 액세스 정책을 붙인다 (namespaces가 비면 클러스터 전체).
 
 **DB는 온프레미스에서만 운영한다** (MySQL 8.4, GTID). AWS에는 RDS도, 클라우드 백업·복제도 두지 않는다. 그래서 EKS의 서비스는 온프레미스 연결을 통해 온프레미스 DB(3306)에 접속하며, 이 연결이 끊기면 AWS 쪽 앱도 DB를 쓸 수 없다. 노드 SG의 아웃바운드는 이미 전체 허용이라 SG 변경은 필요 없고, 경로만 추가하면 된다.

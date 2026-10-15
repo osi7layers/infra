@@ -11,3 +11,8 @@ output "user_arns" {
 output "group_names" {
   value = [for g in aws_iam_group.this : g.name]
 }
+
+output "service_user_names" {
+  description = "Jenkins·ArgoCD용 사용자. 액세스 키는 콘솔에서 발급해 CI/CD 담당에게 전달"
+  value       = { for k, u in aws_iam_user.service : k => u.name }
+}

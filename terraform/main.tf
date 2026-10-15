@@ -34,7 +34,6 @@ module "iam" {
 
   project             = var.project
   ecr_pull_policy_arn = module.ecr.pull_policy_arn
-  ecr_push_policy_arn = module.ecr.push_policy_arn
 }
 
 module "eks" {

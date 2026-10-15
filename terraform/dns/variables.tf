@@ -34,7 +34,7 @@ variable "create_acme_user" {
 }
 
 variable "acme_hosts" {
-  description = "자동 갱신 사용자가 TXT를 바꿀 수 있는 호스트 이름 (_acme-challenge.<호스트>.<domain>)"
+  description = "자동 갱신 사용자가 TXT를 바꿀 수 있는 호스트 이름 (_acme-challenge.<호스트>.<domain>). 온프레미스 인증서용"
   type        = list(string)
-  default     = ["harbor"]
+  default     = ["harbor", "shop", "api", "keycloak"]
 }

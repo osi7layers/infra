@@ -10,8 +10,3 @@ output "node_role_arn" {
 output "eks_cluster_role_arn" {
   value = aws_iam_role.eks_cluster.arn
 }
-
-output "ci_user_name" {
-  description = "액세스 키는 콘솔에서 발급해 Jenkins Credentials에 등록"
-  value       = try(aws_iam_user.ci[0].name, null)
-}
