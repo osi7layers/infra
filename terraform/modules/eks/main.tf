@@ -166,3 +166,44 @@ resource "aws_eks_access_policy_association" "this" {
     namespaces = length(each.value.namespaces) > 0 ? each.value.namespaces : null
   }
 }
+
+# ---------------------------------------------------------------- AWS Load Balancer Controller 권한 (Pod Identity)
+# 컨트롤러 자체는 Helm으로 kube-system에 설치한다 (Terraform 밖). 여기서는 그 서비스 계정이 쓸 AWS 권한만 만든다.
+# Gateway API 컨트롤러 앞단의 NLB를 이 컨트롤러가 만들고 지운다.
+data "aws_iam_policy_document" "pod_identity_assume" {
+  statement {
+    actions = ["sts:AssumeRole", "sts:TagSession"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "lb_controller" {
+  name               = "${var.project}-aws-load-balancer-controller"
+  assume_role_policy = data.aws_iam_policy_document.pod_identity_assume.json
+}
+
+resource "aws_iam_policy" "lb_controller" {
+  #checkov:skip=CKV_AWS_355:AWS 공식 정책 그대로. 만들 리소스의 ARN을 미리 알 수 없어 "*"를 쓰고, 생성·삭제는 elbv2.k8s.aws/cluster 태그 조건으로 제한함
+  #checkov:skip=CKV_AWS_290:위와 같음
+  #checkov:skip=CKV_AWS_289:위와 같음
+  # 출처: kubernetes-sigs/aws-load-balancer-controller v3.6.0 docs/install/iam_policy.json (수정 없음).
+  # 설치하는 컨트롤러 버전을 올리면 같은 버전의 파일로 바꾼다.
+  name   = "${var.project}-aws-load-balancer-controller"
+  policy = file("${path.module}/policies/aws-load-balancer-controller.json")
+}
+
+resource "aws_iam_role_policy_attachment" "lb_controller" {
+  role       = aws_iam_role.lb_controller.name
+  policy_arn = aws_iam_policy.lb_controller.arn
+}
+
+resource "aws_eks_pod_identity_association" "lb_controller" {
+  cluster_name    = aws_eks_cluster.this.name
+  namespace       = "kube-system"
+  service_account = "aws-load-balancer-controller"
+  role_arn        = aws_iam_role.lb_controller.arn
+}

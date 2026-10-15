@@ -103,3 +103,36 @@ data "aws_iam_policy_document" "acme" {
     }
   }
 }
+
+# ---------------------------------------------------------------- AWS 쪽 HTTPS 인증서 (ACM)
+# EKS 앞단 NLB의 TLS 리스너에 붙인다 (Service annotation aws-load-balancer-ssl-cert에 ARN). 인증서 하나에 이름을 모두 넣는다.
+# 메인을 destroy해도 남도록 여기 둔다. ACM 공인 인증서는 무료이고, 검증 레코드가 남아 있으면 AWS가 자동으로 갱신한다.
+# 온프레미스 쪽 같은 이름의 인증서는 Let's Encrypt(위 acme 사용자)로 따로 발급한다.
+resource "aws_acm_certificate" "aws_ingress" {
+  domain_name               = "${var.acm_hosts[0]}.${var.domain}"
+  subject_alternative_names = [for h in slice(var.acm_hosts, 1, length(var.acm_hosts)) : "${h}.${var.domain}"]
+  validation_method         = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_route53_record" "acm_validation" {
+  for_each = {
+    for o in aws_acm_certificate.aws_ingress.domain_validation_options : o.domain_name => o
+  }
+
+  zone_id = data.aws_route53_zone.this.zone_id
+  name    = each.value.resource_record_name
+  type    = each.value.resource_record_type
+  ttl     = 300
+  records = [each.value.resource_record_value]
+
+  allow_overwrite = true
+}
+
+resource "aws_acm_certificate_validation" "aws_ingress" {
+  certificate_arn         = aws_acm_certificate.aws_ingress.arn
+  validation_record_fqdns = [for r in aws_route53_record.acm_validation : r.fqdn]
+}
