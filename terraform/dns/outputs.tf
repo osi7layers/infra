@@ -12,3 +12,8 @@ output "acme_user_name" {
   description = "인증서 자동 갱신용 IAM 사용자. 액세스 키는 콘솔에서 발급"
   value       = try(aws_iam_user.acme[0].name, null)
 }
+
+output "acm_certificate_arn" {
+  description = "AWS 쪽 NLB TLS 리스너용 인증서. Service annotation service.beta.kubernetes.io/aws-load-balancer-ssl-cert에 넣는다"
+  value       = aws_acm_certificate_validation.aws_ingress.certificate_arn
+}

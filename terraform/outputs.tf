@@ -36,3 +36,8 @@ output "eks_cluster_name" {
 output "eks_cluster_endpoint" {
   value = module.eks.cluster_endpoint
 }
+
+output "lb_controller_role_arn" {
+  description = "AWS Load Balancer Controller 역할. Helm 설치 시 serviceAccount.name=aws-load-balancer-controller, clusterName·vpcId와 함께 사용"
+  value       = module.eks.lb_controller_role_arn
+}

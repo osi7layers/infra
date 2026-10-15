@@ -38,3 +38,14 @@ variable "acme_hosts" {
   type        = list(string)
   default     = ["harbor", "shop", "api", "keycloak"]
 }
+
+variable "acm_hosts" {
+  description = "AWS 쪽 NLB에 붙일 ACM 인증서의 호스트 이름 (첫 번째가 대표 이름, 나머지는 SAN)"
+  type        = list(string)
+  default     = ["shop", "api"]
+
+  validation {
+    condition     = length(var.acm_hosts) > 0
+    error_message = "호스트 이름이 하나 이상 있어야 합니다."
+  }
+}
