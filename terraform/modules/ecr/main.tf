@@ -43,14 +43,10 @@ locals {
     "ecr:BatchGetImage",
     "ecr:GetDownloadUrlForLayer",
   ]
-
-  push_actions = [
-    "ecr:CompleteLayerUpload",
-    "ecr:InitiateLayerUpload",
-    "ecr:PutImage",
-    "ecr:UploadLayerPart",
-  ]
 }
+
+# Push 정책은 여기 두지 않는다. Jenkins와 cicd 그룹이 쓰는 osi7-ecr-push는 terraform/iam-users가
+# <namespace>/* 이름으로 만든다 (메인을 destroy해도 Jenkins 키가 남게, 같은 이름의 정책이 두 번 생기지 않게).
 
 data "aws_iam_policy_document" "pull" {
   # 로그인 토큰 발급은 특정 리포지토리에 걸 수 없어서 Resource "*"가 필수다.
@@ -67,30 +63,10 @@ data "aws_iam_policy_document" "pull" {
   }
 }
 
-data "aws_iam_policy_document" "push" {
-  statement {
-    sid       = "GetAuthorizationToken"
-    actions   = ["ecr:GetAuthorizationToken"]
-    resources = ["*"]
-  }
-
-  statement {
-    sid       = "PushAndPullImages"
-    actions   = concat(local.pull_actions, local.push_actions)
-    resources = local.repository_arns
-  }
-}
-
 resource "aws_iam_policy" "pull" {
   name        = "${var.project}-ecr-pull"
   description = "ECR 이미지 Pull 전용"
   policy      = data.aws_iam_policy_document.pull.json
-}
-
-resource "aws_iam_policy" "push" {
-  name        = "${var.project}-ecr-push"
-  description = "ECR 이미지 Push(및 Pull)"
-  policy      = data.aws_iam_policy_document.push.json
 }
 
 # ---------------------------------------------------------------- 레지스트리 주소 (Jenkins 로그인, GitOps 이미지 경로용)

@@ -111,6 +111,44 @@ resource "aws_iam_group_policy_attachment" "self_mfa" {
   policy_arn = aws_iam_policy.this["self-mfa"].arn
 }
 
+# ---------------------------------------------------------------- 서비스 계정 (사람이 아닌 프로그램용)
+# 온프레미스의 Jenkins와 ArgoCD가 액세스 키로 쓴다. 팀원 그룹(local.groups)에 넣지 않는 이유는
+# 자기 자격 증명 관리 정책(self-mfa)이 붙지 않게 하려고다. 액세스 키는 콘솔에서 발급해 CI/CD 담당에게 전달한다.
+locals {
+  service_users = {
+    jenkins = { user = "${var.project}-jenkins-ecr-push", policy = "ecr-push" } # ECR push (Harbor와 이중 push)
+    argocd  = { user = "${var.project}-argocd", policy = "eks-read" }           # EKS 원격 관리. kubectl 권한은 메인의 Access Entry
+  }
+}
+
+resource "aws_iam_group" "service" {
+  for_each = local.service_users
+
+  name = "${var.project}-${each.key}"
+}
+
+resource "aws_iam_group_policy_attachment" "service" {
+  for_each = local.service_users
+
+  group      = aws_iam_group.service[each.key].name
+  policy_arn = aws_iam_policy.this[each.value.policy].arn
+}
+
+resource "aws_iam_user" "service" {
+  #checkov:skip=CKV_AWS_273:온프레미스 Jenkins·ArgoCD는 SSO를 쓸 수 없어 IAM 사용자(그룹 권한, 필요한 권한만)를 사용. 액세스 키는 주기적으로 교체
+  for_each = local.service_users
+
+  name          = each.value.user
+  force_destroy = true # 콘솔에서 발급한 액세스 키가 있어도 destroy 가능
+}
+
+resource "aws_iam_user_group_membership" "service" {
+  for_each = local.service_users
+
+  user   = aws_iam_user.service[each.key].name
+  groups = [aws_iam_group.service[each.key].name]
+}
+
 # ---------------------------------------------------------------- 정책 문서
 # EKS 조회. aws eks update-kubeconfig에 eks:DescribeCluster가 필요하다 (kubectl 권한 자체는 Access Entry가 준다)
 data "aws_iam_policy_document" "eks_read" {
@@ -152,7 +190,7 @@ data "aws_iam_policy_document" "vpn_write" {
   }
 }
 
-# 지은: 프로젝트 리포지토리에만 push/pull. 로그인 토큰 발급(GetAuthorizationToken)은 AWS 구조상 리소스를 좁힐 수 없다
+# 지은(cicd 그룹)과 Jenkins: 프로젝트 리포지토리에만 push/pull. 로그인 토큰 발급(GetAuthorizationToken)은 AWS 구조상 리소스를 좁힐 수 없다
 data "aws_iam_policy_document" "ecr_push" {
   statement {
     sid       = "EcrLogin"

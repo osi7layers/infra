@@ -23,10 +23,6 @@ output "ecr_repository_urls" {
   value       = module.ecr.repository_urls
 }
 
-output "ci_user_name" {
-  value = module.iam.ci_user_name
-}
-
 output "ecr_registry_url" {
   description = "Jenkins의 ECR 로그인, GitOps overlays/aws 이미지 주소에 사용"
   value       = module.ecr.registry_url
