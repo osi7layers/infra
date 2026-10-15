@@ -26,7 +26,7 @@ state는 S3 버킷(`osi7-tfstate-<계정ID>`)의 `aws/terraform.tfstate`에 있�
 
 버킷은 `terraform/bootstrap/`이 만든다. bootstrap은 별도의 Terraform 루트로, state를 로컬에 두고 계정마다 한 번만 apply한다. 버킷에는 `prevent_destroy`가 걸려 있다. 버킷 이름은 `terraform/backend.hcl`, `terraform/iam-users/backend.hcl`, `terraform/dns/backend.hcl` 세 곳에 있다. bootstrap의 state(`terraform/bootstrap/terraform.tfstate`)는 git에 없고 bootstrap을 apply한 PC에만 있다. 다른 계정으로 옮길 때는 세 파일의 `bucket`을 bootstrap 출력값 `state_bucket_name`으로 바꾸고 `terraform init -backend-config=backend.hcl -reconfigure`를 한다 (기존 state를 옮길 거라면 `-migrate-state`).
 
-프로젝트 계정은 `918633123181`이다 (처음에는 테스트용이었고 그대로 프로젝트 계정으로 쓴다). 지금은 **Free plan**이라 프리 티어 대상 인스턴스 타입만 띄울 수 있고(그래서 노드가 `t3.small`), 크레딧이 떨어지거나 플랜 만료일이 지나면 계정이 닫힌다. 유료 플랜으로 바꿀 예정이며, 바꾸면 `eks_node_instance_types`를 실제 사양으로 올린다. 플랜 상태와 남은 크레딧은 `aws freetier get-account-plan-state`로 본다. 메인 인프라를 켜 두면 크레딧이 빨리 줄어드니 쓰지 않을 때는 destroy한다.
+프로젝트 계정은 `918633123181`이다 (처음에는 테스트용이었고 그대로 프로젝트 계정으로 쓴다). 지금은 **Free plan**이라 프리 티어 대상 인스턴스 타입만 띄울 수 있고(그래서 노드가 `m7i-flex.large` 2~3대. t3.small은 앱 Pod 메모리 요청에 부족), 크레딧이 떨어지거나 플랜 만료일이 지나면 계정이 닫힌다. 유료 플랜으로 바꿀 예정이며, 바꾸면 `eks_node_instance_types`를 실제 사양으로 올린다. 플랜 상태와 남은 크레딧은 `aws freetier get-account-plan-state`로 본다. 메인 인프라를 켜 두면 크레딧이 빨리 줄어드니 쓰지 않을 때는 destroy한다.
 
 AWS 자격 증명: 루트와 테스트용 `sesac_cho`는 쓰지 않는다 (sesac_cho와 `sesac` 그룹은 삭제함). `aws login --profile myungho`로 로그인하고, Terraform과 CLI는 `AWS_PROFILE=terraform`(사용자 환경 변수로 설정됨)을 쓴다. `terraform` 프로필은 `credential_process`로 myungho의 로그인 세션을 읽는다. 그냥 `aws login`을 하면 `terraform` 프로필로 로그인을 시도해 실패하므로 `--profile myungho`를 꼭 붙인다. 계정 ID는 코드에 적지 않고 `aws_caller_identity`로 읽으므로, 계정마다 바뀌는 곳은 위의 `backend.hcl` 세 개뿐이다.
 

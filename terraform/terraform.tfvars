@@ -31,10 +31,12 @@ ecr_force_delete         = true
 eks_kubernetes_version = "1.36" # 온프레미스 1.36.5와 같은 마이너 버전 (EKS는 패치 버전을 AWS가 관리)
 # API 서버 공개 접근 허용 IP. 팀원 공인 IP/32, 온프레미스 NAT 공인 IP/32를 넣는다. 비우면 VPC/VPN 안에서만 접근
 eks_public_access_cidrs = []
-eks_node_instance_types = ["t3.small"] # 테스트용 임시값. 실제 프로젝트에서는 사양 협의 후 변경 (프리 플랜: 프리 티어 대상 + 2a/2c 지원 타입만 가능, c7i-flex는 2a/2c 미지원)
+# 노드: 앱 Pod가 메모리 512Mi를 요청해 t3.small(2GiB)은 부족 (예찬님 계산: 평소 앱 requests CPU 2.2 / 4.5Gi, 최대 3.7 / 7.5Gi + 시스템)
+# Free plan에서 쓸 수 있는 m7i-flex.large(2 vCPU / 8GiB)로 평소 2대, 최대 3대. 유료 플랜 전환 후 필요한 사양으로 변경
+eks_node_instance_types = ["m7i-flex.large"]
 eks_node_desired_size   = 2
 eks_node_min_size       = 2
-eks_node_max_size       = 4
+eks_node_max_size       = 3
 
 # 팀원 kubectl 권한. 사용자는 terraform/iam-users가 만들므로 iam-users를 먼저 apply한다.
 # 클러스터 생성자에게 자동으로 관리자를 주지 않으므로 명호도 여기 넣는다.
