@@ -101,9 +101,9 @@ variable "eks_public_access_cidrs" {
 }
 
 variable "eks_node_instance_types" {
-  description = "EKS 노드 인스턴스 타입 (테스트용 임시: t3.small). 프리 플랜 계정이라 프리 티어 대상 + 2a/2c 지원 타입만 가능 (m7i-flex.large, t3.small 등)"
+  description = "EKS 노드 인스턴스 타입 (Free plan 임시: m7i-flex.large). 프리 플랜 계정이라 프리 티어 대상 + 2a/2c 지원 타입만 가능. 유료 플랜 전환 후 필요한 사양으로 변경"
   type        = list(string)
-  default     = ["t3.small"]
+  default     = ["m7i-flex.large"]
 }
 
 variable "eks_node_desired_size" {
@@ -118,7 +118,7 @@ variable "eks_node_min_size" {
 
 variable "eks_node_max_size" {
   type    = number
-  default = 4
+  default = 3
 }
 
 variable "eks_access_entries" {
