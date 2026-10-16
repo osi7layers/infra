@@ -40,7 +40,7 @@ variable "acme_hosts" {
 }
 
 variable "acm_hosts" {
-  description = "AWS 쪽 NLB에 붙일 ACM 인증서의 호스트 이름 (첫 번째가 대표 이름, 나머지는 SAN)"
+  description = "AWS 쪽 LB(NLB 또는 ALB)에 붙일 ACM 인증서의 호스트 이름 (첫 번째가 대표 이름, 나머지는 SAN)"
   type        = list(string)
   default     = ["shop", "api"]
 

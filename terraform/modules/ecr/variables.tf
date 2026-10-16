@@ -3,7 +3,7 @@ variable "project" {
 }
 
 variable "repositories" {
-  description = "ECR 리포지토리 이름 목록 (실제 이름은 '<project>/<이름>')"
+  description = "ECR 리포지토리 이름 목록 (실제 이름은 '<namespace>/<이름>', 예: ecommerce/web)"
   type        = list(string)
 }
 

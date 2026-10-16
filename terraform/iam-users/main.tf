@@ -65,6 +65,11 @@ resource "aws_iam_user" "this" {
 
   name          = each.key
   force_destroy = true # 콘솔에서 만든 비밀번호, MFA, 액세스 키가 있어도 destroy 가능
+
+  # 콘솔에서 액세스 키를 만들 때 넣은 설명은 사용자 태그(<키 ID> = 설명)로 저장된다. 지우지 않게 무시한다
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 resource "aws_iam_user_group_membership" "this" {
@@ -140,6 +145,11 @@ resource "aws_iam_user" "service" {
 
   name          = each.value.user
   force_destroy = true # 콘솔에서 발급한 액세스 키가 있어도 destroy 가능
+
+  # 액세스 키 설명 태그(<키 ID> = 설명)를 지우지 않게 무시한다
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 resource "aws_iam_user_group_membership" "service" {
@@ -225,7 +235,7 @@ data "aws_iam_policy_document" "k6_ec2" {
 
 # 자기 비밀번호, MFA, 액세스 키를 스스로 관리하는 권한 (MFA 등록은 팀 규칙으로 하고 정책으로 강제하지 않는다).
 # MFA가 없으면 거부하는 Deny 문은 일부러 두지 않았다. aws login으로 받은 CLI 세션은 콘솔에서 MFA로 로그인했어도
-# aws:MultiFactorAuthPresent=false로 표시되어, Deny가 있으면 Terraform을 포함한 모든 CLI 작업이 막힌다 (테스트 계정에서 확인).
+# aws:MultiFactorAuthPresent=false로 표시되어, Deny가 있으면 Terraform을 포함한 모든 CLI 작업이 막힌다 (이 계정에서 확인).
 data "aws_iam_policy_document" "self_mfa" {
   statement {
     sid       = "ViewAccountInfo"

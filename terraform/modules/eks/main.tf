@@ -169,7 +169,7 @@ resource "aws_eks_access_policy_association" "this" {
 
 # ---------------------------------------------------------------- AWS Load Balancer Controller 권한 (Pod Identity)
 # 컨트롤러 자체는 Helm으로 kube-system에 설치한다 (Terraform 밖). 여기서는 그 서비스 계정이 쓸 AWS 권한만 만든다.
-# Gateway API 컨트롤러 앞단의 NLB를 이 컨트롤러가 만들고 지운다.
+# 진입 LB(NLB → Gateway API 또는 ALB → APISIX, 미정)를 이 컨트롤러가 만들고 지운다.
 data "aws_iam_policy_document" "pod_identity_assume" {
   statement {
     actions = ["sts:AssumeRole", "sts:TagSession"]

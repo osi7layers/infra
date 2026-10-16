@@ -14,7 +14,7 @@ output "acme_user_name" {
 }
 
 output "acm_certificate_arn" {
-  description = "AWS 쪽 NLB TLS 리스너용 인증서. Service annotation service.beta.kubernetes.io/aws-load-balancer-ssl-cert에 넣는다"
+  description = "AWS 쪽 LB TLS 리스너용 인증서. NLB는 Service annotation service.beta.kubernetes.io/aws-load-balancer-ssl-cert, ALB는 Ingress annotation alb.ingress.kubernetes.io/certificate-arn에 넣는다"
   value       = aws_acm_certificate_validation.aws_ingress.certificate_arn
 }
 

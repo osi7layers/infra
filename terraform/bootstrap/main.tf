@@ -1,4 +1,4 @@
-# 메인 terraform의 state를 저장할 S3 버킷.
+# 모든 Terraform 루트(메인, iam-users, dns)의 state를 저장할 S3 버킷.
 # 이 폴더의 state는 로컬에 둔다 (버킷이 생기기 전이라 원격에 둘 수 없음). 계정마다 한 번만 apply 한다.
 
 data "aws_caller_identity" "current" {}

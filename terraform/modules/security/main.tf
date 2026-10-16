@@ -74,7 +74,7 @@ resource "aws_vpc_security_group_ingress_rule" "node_self" {
 }
 
 # 온프레미스에서 노드로 들어오는 규칙은 두지 않는다.
-# - K8s API는 노드가 아니라 EKS 컨트롤 플레인에 있다 (온프레미스 접근은 vpn 모듈에서 클러스터 SG 443으로 연다)
+# - K8s API는 노드가 아니라 EKS 컨트롤 플레인에 있다 (온프레미스 연결이 생기면 eks 모듈에서 클러스터 SG 443을 연다)
 # - 노드에는 SSH 키가 없다. 노드 접속이 필요하면 SSM Session Manager를 쓴다
 
 # 노드는 NAT를 통해 이미지 pull, 패키지 설치 등 외부 통신이 필요하다
