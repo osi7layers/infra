@@ -7,7 +7,7 @@ create_acme_user = true
 # 온프레미스 인증서 자동 갱신 대상 (_acme-challenge.<호스트>.osi7.shop TXT만 바꿀 수 있음)
 acme_hosts = ["harbor", "shop", "api", "keycloak"]
 
-# AWS 쪽 NLB용 ACM 인증서 (shop.osi7.shop + api.osi7.shop). 이 호스트들이 온프레미스/AWS 가중치 레코드도 된다
+# AWS 쪽 LB(NLB 또는 ALB)용 ACM 인증서 (shop.osi7.shop + api.osi7.shop). 이 호스트들이 온프레미스/AWS 가중치 레코드도 된다
 acm_hosts = ["shop", "api"]
 
 # 온프레미스 진입 공인 IP (네트워크 담당 확인 대기). 비어 있으면 온프레미스 레코드를 만들지 않는다

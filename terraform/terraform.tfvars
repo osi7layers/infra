@@ -11,9 +11,9 @@ app_subnet_cidrs    = ["10.20.10.0/24", "10.20.11.0/24"]
 
 nat_gateway_count = 1
 
-# 온프레미스 대역은 임시값. 광렬님께 확인 후 수정 (VPC 대역과 겹치면 안 됨)
+# 온프레미스 대역 (네트워크 담당 확인). DB는 PC3의 MySQL Router 10.50.3.100:6450
 # 지금은 쓰지 않음. 온프레미스 연결 방식(VPN/Tailscale)이 정해지면 경로와 SG에 사용
-onprem_cidr = "192.168.0.0/16"
+onprem_cidr = "10.50.0.0/16"
 
 # ALB -> Node 서비스 포트. APISIX/Gateway 포트가 정해지면 좁힌다 (임시: NodePort 범위)
 node_service_port_from = 30000

@@ -40,6 +40,11 @@ resource "aws_iam_user" "acme" {
   count = var.create_acme_user ? 1 : 0
 
   name = "${var.project}-acme-harbor"
+
+  # 콘솔에서 액세스 키를 만들 때 넣은 설명은 사용자 태그(<키 ID> = 설명)로 저장된다. 지우지 않게 무시한다
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 resource "aws_iam_user_group_membership" "acme" {
@@ -105,7 +110,8 @@ data "aws_iam_policy_document" "acme" {
 }
 
 # ---------------------------------------------------------------- AWS 쪽 HTTPS 인증서 (ACM)
-# EKS 앞단 NLB의 TLS 리스너에 붙인다 (Service annotation aws-load-balancer-ssl-cert에 ARN). 인증서 하나에 이름을 모두 넣는다.
+# EKS 앞단 LB(NLB 또는 ALB, 진입 방식 미정)의 TLS 리스너에 붙인다. 인증서 하나에 이름을 모두 넣는다.
+# ARN은 NLB면 Service annotation service.beta.kubernetes.io/aws-load-balancer-ssl-cert, ALB면 Ingress annotation alb.ingress.kubernetes.io/certificate-arn에 넣는다.
 # 메인을 destroy해도 남도록 여기 둔다. ACM 공인 인증서는 무료이고, 검증 레코드가 남아 있으면 AWS가 자동으로 갱신한다.
 # 온프레미스 쪽 같은 이름의 인증서는 Let's Encrypt(위 acme 사용자)로 따로 발급한다.
 resource "aws_acm_certificate" "aws_ingress" {

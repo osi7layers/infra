@@ -1,7 +1,3 @@
-output "node_role_name" {
-  value = aws_iam_role.node.name
-}
-
 output "node_role_arn" {
   description = "EKS 관리형 노드 그룹에 붙일 역할"
   value       = aws_iam_role.node.arn

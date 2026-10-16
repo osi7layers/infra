@@ -41,9 +41,9 @@ variable "nat_gateway_count" {
 }
 
 variable "onprem_cidr" {
-  description = "온프레미스 대역 (임시값, 광렬님 확인 필요). 지금은 어디에도 쓰지 않으며, 온프레미스 연결 방식(VPN/Tailscale)이 정해지면 경로와 SG에 사용. VPC 대역과 겹치면 안 됨"
+  description = "온프레미스 대역 (네트워크 담당 확인: 10.50.0.0/16, PC1 10.50.1.0/24 · PC2 10.50.2.0/24 · PC3 10.50.3.0/24). 지금은 어디에도 쓰지 않으며, 온프레미스 연결 방식(VPN/Tailscale)이 정해지면 경로와 SG에 사용. VPC 대역과 겹치면 안 됨"
   type        = string
-  default     = "192.168.0.0/16"
+  default     = "10.50.0.0/16"
 }
 
 variable "node_service_port_from" {

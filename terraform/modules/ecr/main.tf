@@ -34,7 +34,7 @@ resource "aws_ecr_lifecycle_policy" "this" {
   })
 }
 
-# ---------------------------------------------------------------- IAM 정책 (Pull / Push)
+# ---------------------------------------------------------------- IAM 정책 (Pull)
 locals {
   repository_arns = [for r in aws_ecr_repository.this : r.arn]
 
