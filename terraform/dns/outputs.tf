@@ -17,3 +17,17 @@ output "acm_certificate_arn" {
   description = "AWS 쪽 NLB TLS 리스너용 인증서. Service annotation service.beta.kubernetes.io/aws-load-balancer-ssl-cert에 넣는다"
   value       = aws_acm_certificate_validation.aws_ingress.certificate_arn
 }
+
+output "service_records" {
+  description = "서비스 레코드 (이름, 쪽, 가중치). 가중치가 null이면 단순 레코드"
+  value = concat(
+    [for r in aws_route53_record.onprem_weighted : { name = r.name, side = "onprem", weight = var.onprem_weight }],
+    [for r in aws_route53_record.aws_weighted : { name = r.name, side = "aws", weight = var.aws_weight }],
+    [for r in aws_route53_record.onprem_only : { name = r.name, side = "onprem", weight = null }],
+  )
+}
+
+output "aws_lb_dns_name" {
+  description = "태그로 찾은 AWS 쪽 LB 주소 (aws_ingress_enabled = false면 null)"
+  value       = try(data.aws_lb.ingress[0].dns_name, null)
+}
