@@ -136,3 +136,87 @@ resource "aws_acm_certificate_validation" "aws_ingress" {
   certificate_arn         = aws_acm_certificate.aws_ingress.arn
   validation_record_fqdns = [for r in aws_route53_record.acm_validation : r.fqdn]
 }
+
+# ---------------------------------------------------------------- 서비스 레코드 (온프레미스 + AWS 가중치)
+# acm_hosts(shop, api)는 온프레미스와 AWS가 같이 받는다. 같은 이름에 가중치 레코드를 쪽마다 하나씩 두고,
+# 전환 단계(온프레미스:AWS = 100:0 -> 95:5 -> 50:50 -> 0:100)는 onprem_weight / aws_weight만 바꿔 apply한다.
+# 한쪽 레코드만 있으면 그쪽으로 100% 간다. 가중치 0인 레코드는 나머지가 모두 비정상일 때만 응답된다.
+locals {
+  onprem_enabled       = var.onprem_public_ip != ""
+  onprem_health_checks = local.onprem_enabled && var.onprem_health_check_path != ""
+}
+
+# AWS 쪽 LB는 Terraform이 아니라 클러스터 안의 LB Controller가 만들고 이름도 자동으로 붙인다.
+# 그래서 태그로 찾는다 (NLB든 ALB든 같음). 메인이 올라가 LB가 생긴 뒤에 aws_ingress_enabled를 켜고,
+# 메인을 destroy하기 전에 끄고 apply한다 (켜 둔 채로 LB가 없어지면 plan이 조회 실패로 멈춘다).
+data "aws_lb" "ingress" {
+  count = var.aws_ingress_enabled ? 1 : 0
+
+  tags = var.aws_lb_tags
+}
+
+# 온프레미스 진입 공인 IP 상태 검사. AWS 밖 대상 + HTTPS라 개당 월 약 $2.75
+resource "aws_route53_health_check" "onprem" {
+  for_each = local.onprem_health_checks ? toset(var.acm_hosts) : toset([])
+
+  type              = "HTTPS"
+  ip_address        = var.onprem_public_ip
+  port              = 443
+  fqdn              = "${each.key}.${var.domain}" # SNI와 Host 헤더에 쓰인다
+  enable_sni        = true
+  resource_path     = var.onprem_health_check_path
+  failure_threshold = 3
+  request_interval  = 30
+
+  tags = { Name = "${var.project}-onprem-${each.key}" }
+}
+
+resource "aws_route53_record" "onprem_weighted" {
+  #checkov:skip=CKV2_AWS_23:AWS 리소스가 아니라 온프레미스 진입 공인 IP를 가리키는 레코드
+  for_each = local.onprem_enabled ? toset(var.acm_hosts) : toset([])
+
+  zone_id        = data.aws_route53_zone.this.zone_id
+  name           = "${each.key}.${var.domain}"
+  type           = "A"
+  ttl            = 60 # 가중치를 바꾸면 1분 안에 반영되도록 짧게
+  records        = [var.onprem_public_ip]
+  set_identifier = "onprem"
+
+  weighted_routing_policy {
+    weight = var.onprem_weight
+  }
+
+  health_check_id = try(aws_route53_health_check.onprem[each.key].id, null)
+}
+
+# LB 뒤에 정상 대상이 없으면 Route 53이 이 레코드를 자동으로 뺀다 (alias라 상태 검사 비용 없음)
+resource "aws_route53_record" "aws_weighted" {
+  for_each = var.aws_ingress_enabled ? toset(var.acm_hosts) : toset([])
+
+  zone_id        = data.aws_route53_zone.this.zone_id
+  name           = "${each.key}.${var.domain}"
+  type           = "A"
+  set_identifier = "aws"
+
+  weighted_routing_policy {
+    weight = var.aws_weight
+  }
+
+  alias {
+    name                   = data.aws_lb.ingress[0].dns_name
+    zone_id                = data.aws_lb.ingress[0].zone_id
+    evaluate_target_health = true
+  }
+}
+
+# keycloak 등 온프레미스에만 있는 호스트
+resource "aws_route53_record" "onprem_only" {
+  #checkov:skip=CKV2_AWS_23:AWS 리소스가 아니라 온프레미스 진입 공인 IP를 가리키는 레코드
+  for_each = local.onprem_enabled ? toset(var.onprem_hosts) : toset([])
+
+  zone_id = data.aws_route53_zone.this.zone_id
+  name    = "${each.key}.${var.domain}"
+  type    = "A"
+  ttl     = 300
+  records = [var.onprem_public_ip]
+}

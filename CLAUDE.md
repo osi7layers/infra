@@ -59,7 +59,14 @@ kubectl 권한은 메인의 `eks_access_entries`(같은 사용자 이름 -> EKS 
 3. `nslookup -type=NS osi7.shop`에 awsdns 주소 4개가 나오면 위임 완료.
 4. `harbor_ip`(harbor-01의 Tailscale IP)를 넣고 `terraform/dns`에서 apply하면 `harbor.osi7.shop` A 레코드가 생긴다. Tailscale IP라 tailnet 안의 기기(Jenkins, 온프레미스 K8s 노드)에서만 접속된다.
 
-AWS 쪽 진입은 Gateway API 컨트롤러 앞에 LB Controller가 만든 NLB를 두고, TLS는 NLB에서 ACM 인증서로 끝낸다. 그 인증서(`shop`, `api`, `acm_hosts` 변수)는 메인 destroy와 상관없이 남도록 `terraform/dns`가 DNS 검증으로 만들고, ARN은 `acm_certificate_arn` 출력이다.
+AWS 쪽 진입은 Gateway API 컨트롤러 앞에 LB Controller가 만든 NLB를 두고, TLS는 NLB에서 ACM 인증서로 끝낸다. 그 인증서(`shop`, `api`, `acm_hosts` 변수)는 메인 destroy와 상관없이 남도록 `terraform/dns`가 DNS 검증으로 만들고, ARN은 `acm_certificate_arn` 출력이다. (진입 방식은 NLB → Gateway와 ALB → APISIX 중 아직 미정)
+
+`acm_hosts`(shop, api)는 온프레미스와 AWS가 같이 받는 이름이라, `terraform/dns`가 쪽마다 가중치 레코드를 하나씩 만든다 (`set_identifier` onprem / aws).
+- **온프레미스 쪽:** `onprem_public_ip`를 가리키는 A 레코드다 (TTL 60). 이 IP가 비어 있으면 온프레미스 레코드와 `onprem_hosts`(keycloak, 온프레미스 전용 단순 A 레코드)를 만들지 않는다.
+- **AWS 쪽:** LB Controller가 만든 LB를 `aws_lb_tags`로 찾아 가리키는 alias 레코드다 (`evaluate_target_health`).
+- **AWS 쪽 켜고 끄는 순서:** 메인 apply → LB 생성 → `aws_ingress_enabled = true`로 dns apply. 메인을 destroy하기 **전에** false로 apply한다. 켜 둔 채로 LB가 없어지면 dns plan이 조회 실패로 멈춘다.
+- **전환 단계:** 온프레미스:AWS = 100:0 → 95:5 → 50:50 → 0:100이다. `onprem_weight`와 `aws_weight`만 바꿔 dns를 apply한다.
+- **상태 검사:** `onprem_health_check_path`를 넣으면 온프레미스 쪽에 Route 53 HTTPS 상태 검사가 붙는다 (개당 월 약 $2.75).
 
 Harbor 인증서(Let's Encrypt, DNS-01)는 첫 발급만 수동이다. 온프레미스 담당이 알려 주는 `_acme-challenge.harbor` TXT를 콘솔에서 넣고, 발급 후 지운다 (Terraform 코드에 없는 레코드라 apply가 건드리지 않는다). 그다음 `create_acme_user = true`로 apply해 자동 갱신용 사용자 `osi7-acme-harbor`를 만들고, 콘솔에서 액세스 키를 발급해 영역 ID(`zone_id` 출력)와 함께 전달한다. 이 사용자는 `acme_hosts`(harbor, shop, api, keycloak — 온프레미스 쪽 인증서)로 정한 `_acme-challenge.<호스트>.osi7.shop` TXT만 바꿀 수 있다. 이름은 harbor지만 사용자를 다시 만들면 발급한 키가 무효가 되므로 이름은 그대로 둔다. 인증서는 90일짜리이고 만료 30일 전에 갱신되므로, 첫 발급 후 60일 안에 자동화를 끝낸다.
 
