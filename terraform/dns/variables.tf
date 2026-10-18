@@ -16,13 +16,13 @@ variable "domain" {
   default     = "osi7.shop"
 }
 
-variable "harbor_ip" {
-  description = "harbor.<domain> A 레코드 값 (harbor-01의 Tailscale IP, 100.x.x.x). 비우면 레코드를 만들지 않는다"
-  type        = string
-  default     = ""
+variable "tailnet_hosts" {
+  description = "Tailscale IP로 접속하는 온프레미스 호스트 (호스트 이름 -> Tailscale IP 100.x.x.x). <호스트>.<domain> A 레코드를 만든다"
+  type        = map(string)
+  default     = {}
 
   validation {
-    condition     = var.harbor_ip == "" || can(cidrhost("${var.harbor_ip}/32", 0))
+    condition     = alltrue([for ip in values(var.tailnet_hosts) : can(cidrhost("${ip}/32", 0))])
     error_message = "IPv4 주소 형식이어야 합니다 (예: 100.64.0.10)."
   }
 }
@@ -36,7 +36,7 @@ variable "create_acme_user" {
 variable "acme_hosts" {
   description = "자동 갱신 사용자가 TXT를 바꿀 수 있는 호스트 이름 (_acme-challenge.<호스트>.<domain>). 온프레미스 인증서용"
   type        = list(string)
-  default     = ["harbor", "shop", "api", "keycloak"]
+  default     = ["harbor", "shop", "api", "keycloak", "grafana"]
 }
 
 variable "acm_hosts" {

@@ -207,3 +207,45 @@ resource "aws_eks_pod_identity_association" "lb_controller" {
   service_account = "aws-load-balancer-controller"
   role_arn        = aws_iam_role.lb_controller.arn
 }
+
+# ---------------------------------------------------------------- Container Insights (노드·Pod 지표, 컨테이너 로그 -> CloudWatch)
+# amazon-cloudwatch-observability 애드온이 CloudWatch 에이전트와 Fluent Bit를 설치한다 (amazon-cloudwatch 네임스페이스).
+# 온프레미스 Grafana는 이 지표와 로그를 CloudWatch 데이터 소스로 조회한다 (조회 권한은 iam-users의 osi7-grafana-read).
+# 로그 그룹을 에이전트가 만들게 두면 보관 기간이 무기한이고 Terraform 밖이라 destroy해도 남으므로 여기서 먼저 만든다.
+resource "aws_cloudwatch_log_group" "container_insights" {
+  #checkov:skip=CKV_AWS_338:학습 프로젝트라 비용을 위해 30일만 보관
+  #checkov:skip=CKV_AWS_158:로그 그룹 KMS 암호화는 비용 대비 효과가 낮아 생략
+  for_each = toset(["application", "dataplane", "host", "performance"])
+
+  name              = "/aws/containerinsights/${var.cluster_name}/${each.key}"
+  retention_in_days = var.log_retention_days
+}
+
+resource "aws_iam_role" "cloudwatch_agent" {
+  name               = "${var.project}-cloudwatch-agent"
+  assume_role_policy = data.aws_iam_policy_document.pod_identity_assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
+  role       = aws_iam_role.cloudwatch_agent.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+resource "aws_eks_addon" "cloudwatch_observability" {
+  cluster_name                = aws_eks_cluster.this.name
+  addon_name                  = "amazon-cloudwatch-observability"
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  # 에이전트와 Fluent Bit가 같은 서비스 계정을 쓴다
+  pod_identity_association {
+    service_account = "cloudwatch-agent"
+    role_arn        = aws_iam_role.cloudwatch_agent.arn
+  }
+
+  depends_on = [
+    aws_eks_addon.this, # Pod Identity 에이전트가 먼저 있어야 권한을 받는다
+    aws_cloudwatch_log_group.container_insights,
+    aws_iam_role_policy_attachment.cloudwatch_agent,
+  ]
+}

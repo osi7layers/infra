@@ -19,3 +19,8 @@ output "lb_controller_role_arn" {
   description = "AWS Load Balancer Controller 역할 (kube-system/aws-load-balancer-controller에 Pod Identity로 연결됨)"
   value       = aws_iam_role.lb_controller.arn
 }
+
+output "container_insights_log_groups" {
+  description = "Container Insights 로그 그룹 (Grafana CloudWatch Logs 조회 대상)"
+  value       = [for g in aws_cloudwatch_log_group.container_insights : g.name]
+}
