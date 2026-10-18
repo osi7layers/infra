@@ -37,6 +37,8 @@ locals {
     "ecr-push"  = data.aws_iam_policy_document.ecr_push.json
     "k6-ec2"    = data.aws_iam_policy_document.k6_ec2.json
     "self-mfa"  = data.aws_iam_policy_document.self_mfa.json
+
+    "grafana-assume" = data.aws_iam_policy_document.grafana_assume.json
   }
 }
 
@@ -117,12 +119,13 @@ resource "aws_iam_group_policy_attachment" "self_mfa" {
 }
 
 # ---------------------------------------------------------------- 서비스 계정 (사람이 아닌 프로그램용)
-# 온프레미스의 Jenkins와 ArgoCD가 액세스 키로 쓴다. 팀원 그룹(local.groups)에 넣지 않는 이유는
-# 자기 자격 증명 관리 정책(self-mfa)이 붙지 않게 하려고다. 액세스 키는 콘솔에서 발급해 CI/CD 담당에게 전달한다.
+# 온프레미스의 Jenkins, ArgoCD, Grafana가 액세스 키로 쓴다. 팀원 그룹(local.groups)에 넣지 않는 이유는
+# 자기 자격 증명 관리 정책(self-mfa)이 붙지 않게 하려고다. 액세스 키는 콘솔에서 발급해 각 담당에게 전달한다.
 locals {
   service_users = {
     jenkins = { user = "${var.project}-jenkins-ecr-push", policy = "ecr-push" } # ECR push (Harbor와 이중 push)
     argocd  = { user = "${var.project}-argocd", policy = "eks-read" }           # EKS 원격 관리. kubectl 권한은 메인의 Access Entry
+    grafana = { user = "${var.project}-grafana", policy = "grafana-assume" }    # 온프레미스 Grafana CloudWatch 데이터 소스. 조회는 역할로
   }
 }
 
@@ -140,7 +143,7 @@ resource "aws_iam_group_policy_attachment" "service" {
 }
 
 resource "aws_iam_user" "service" {
-  #checkov:skip=CKV_AWS_273:온프레미스 Jenkins·ArgoCD는 SSO를 쓸 수 없어 IAM 사용자(그룹 권한, 필요한 권한만)를 사용. 액세스 키는 주기적으로 교체
+  #checkov:skip=CKV_AWS_273:온프레미스 Jenkins·ArgoCD·Grafana는 SSO를 쓸 수 없어 IAM 사용자(그룹 권한, 필요한 권한만)를 사용. 액세스 키는 주기적으로 교체
   for_each = local.service_users
 
   name          = each.value.user
@@ -157,6 +160,36 @@ resource "aws_iam_user_group_membership" "service" {
 
   user   = aws_iam_user.service[each.key].name
   groups = [aws_iam_group.service[each.key].name]
+}
+
+# ---------------------------------------------------------------- Grafana 조회 역할
+# 온프레미스 Grafana(mon-ubuntu)는 AWS 밖이라 역할을 직접 붙일 수 없다. 그래서 osi7-grafana 사용자의 키로는
+# 이 역할을 맡는 것(AssumeRole)만 하고, CloudWatch 조회는 역할의 임시 자격 증명(1시간)으로 한다.
+# Grafana 데이터 소스: Authentication Provider "Access & secret key" + Assume Role ARN에 이 역할 ARN.
+locals {
+  grafana_role_name = "${var.project}-grafana-read"
+}
+
+data "aws_iam_policy_document" "grafana_trust" {
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "AWS"
+      identifiers = [aws_iam_user.service["grafana"].arn]
+    }
+  }
+}
+
+resource "aws_iam_role" "grafana" {
+  name               = local.grafana_role_name
+  assume_role_policy = data.aws_iam_policy_document.grafana_trust.json
+}
+
+resource "aws_iam_role_policy" "grafana" {
+  name   = "cloudwatch-read"
+  role   = aws_iam_role.grafana.id
+  policy = data.aws_iam_policy_document.grafana_read.json
 }
 
 # ---------------------------------------------------------------- 정책 문서
@@ -230,6 +263,48 @@ data "aws_iam_policy_document" "k6_ec2" {
       variable = "aws:ResourceTag/${var.k6_instance_tag.key}"
       values   = [var.k6_instance_tag.value]
     }
+  }
+}
+
+# osi7-grafana 사용자: 조회 역할을 맡는 것만 가능 (역할 ARN은 순환 참조를 피하려고 이름으로 만든다)
+data "aws_iam_policy_document" "grafana_assume" {
+  statement {
+    actions   = ["sts:AssumeRole"]
+    resources = ["arn:aws:iam::${local.account_id}:role/${local.grafana_role_name}"]
+  }
+}
+
+# Grafana CloudWatch 데이터 소스가 쓰는 조회 권한 (Grafana 문서의 권장 정책). 지표 조회·목록 작업은 리소스를 좁힐 수 없다
+data "aws_iam_policy_document" "grafana_read" {
+  statement {
+    sid       = "Metrics"
+    actions   = ["cloudwatch:DescribeAlarmsForMetric", "cloudwatch:ListMetrics", "cloudwatch:GetMetricData"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid     = "AlarmsAndInsightRules"
+    actions = ["cloudwatch:DescribeAlarmHistory", "cloudwatch:DescribeAlarms", "cloudwatch:GetInsightRuleReport"]
+    resources = [
+      "arn:aws:cloudwatch:${var.region}:${local.account_id}:alarm:*",
+      "arn:aws:cloudwatch:${var.region}:${local.account_id}:insight-rule/*",
+    ]
+  }
+
+  statement {
+    sid = "Logs"
+    actions = [
+      "logs:DescribeLogGroups", "logs:GetLogGroupFields", "logs:StartQuery", "logs:StopQuery",
+      "logs:GetQueryResults", "logs:GetLogEvents",
+    ]
+    resources = ["arn:aws:logs:${var.region}:${local.account_id}:*"]
+  }
+
+  # 차원 값(인스턴스 ID, 태그) 자동 완성용
+  statement {
+    sid       = "Lookup"
+    actions   = ["ec2:DescribeTags", "ec2:DescribeInstances", "ec2:DescribeRegions", "tag:GetResources"]
+    resources = ["*"]
   }
 }
 

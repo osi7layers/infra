@@ -48,6 +48,8 @@ AWS 자격 증명: 루트와 테스트용 `sesac_cho`는 쓰지 않는다 (sesac
 
 온프레미스 프로그램용 서비스 계정도 iam-users에 있다 (`local.service_users`, 팀원 그룹이 아니라서 self-mfa가 붙지 않음). `osi7-jenkins-ecr-push`는 같은 이미지를 Harbor와 ECR에 이중 push하고, `osi7-argocd`는 온프레미스 ArgoCD가 EKS를 원격 클러스터로 관리할 때 쓴다 (kubectl 권한은 메인의 Access Entry, `ecommerce-main` 네임스페이스만). ECR push 정책(`osi7-ecr-push`, `repository/<ecr_namespace>/*`)도 여기서 만들어 cicd 그룹과 Jenkins가 함께 쓴다. 메인에 두면 destroy 때마다 사용자와 키가 지워지기 때문이다. 액세스 키는 콘솔에서 발급해 CI/CD 담당에게 전달한다.
 
+`osi7-grafana`는 온프레미스 Grafana(mon-ubuntu)의 CloudWatch 데이터 소스용이다. AWS 밖이라 역할을 직접 붙일 수 없어서, 이 사용자의 키로는 조회 역할 `osi7-grafana-read`를 맡는 것(AssumeRole)만 하고 실제 조회는 역할의 임시 자격 증명으로 한다 (데이터 소스의 Assume Role ARN = `grafana_role_arn` 출력). 관측 담당이 CLI로 직접 볼 때는 본인 IAM 사용자로 `aws login`을 한다.
+
 kubectl 권한은 메인의 `eks_access_entries`(같은 사용자 이름 -> EKS 액세스 정책, 네임스페이스)가 eks 모듈의 Access Entry로 만든다. EKS는 없는 IAM 사용자로 Access Entry를 만들 수 없으므로 iam-users를 먼저 apply한다. 클러스터 생성자 자동 관리자(`bootstrap_cluster_creator_admin_permissions`)는 꺼 두었으므로 클러스터 관리자도 이 변수에 명시한다.
 
 ### 도메인 (`terraform/dns/`)
@@ -57,7 +59,7 @@ kubectl 권한은 메인의 `eks_access_entries`(같은 사용자 이름 -> EKS 
 1. 콘솔 Route 53 → 호스팅 영역 생성 → `osi7.shop`, 퍼블릭 호스팅 영역.
 2. 영역의 NS 레코드 값 4개를 가비아 도메인 관리의 **네임서버 설정**에 입력 (NS 레코드 추가가 아님, 끝의 `.`은 빼고).
 3. `nslookup -type=NS osi7.shop`에 awsdns 주소 4개가 나오면 위임 완료.
-4. `harbor_ip`(harbor-01의 Tailscale IP)를 넣고 `terraform/dns`에서 apply하면 `harbor.osi7.shop` A 레코드가 생긴다. Tailscale IP라 tailnet 안의 기기(Jenkins, 온프레미스 K8s 노드)에서만 접속된다.
+4. `tailnet_hosts`(호스트 이름 -> Tailscale IP)에 넣고 `terraform/dns`에서 apply하면 `<호스트>.osi7.shop` A 레코드가 생긴다. 지금은 `harbor`(harbor-01)와 `grafana`(mon-ubuntu)다. Tailscale IP라 tailnet 안의 기기에서만 접속된다.
 
 AWS 쪽 진입은 LB Controller가 만든 LB(NLB → Gateway API 또는 ALB → APISIX)를 두고, TLS는 LB에서 ACM 인증서로 끝낸다. 그 인증서(`shop`, `api`, `acm_hosts` 변수)는 메인 destroy와 상관없이 남도록 `terraform/dns`가 DNS 검증으로 만들고, ARN은 `acm_certificate_arn` 출력이다. (둘 중 어느 쪽인지는 아직 미정)
 
@@ -68,7 +70,7 @@ AWS 쪽 진입은 LB Controller가 만든 LB(NLB → Gateway API 또는 ALB → 
 - **전환 단계:** 온프레미스:AWS = 100:0 → 95:5 → 50:50 → 0:100이다. `onprem_weight`와 `aws_weight`만 바꿔 dns를 apply한다.
 - **상태 검사:** `onprem_health_check_path`를 넣으면 온프레미스 쪽에 Route 53 HTTPS 상태 검사가 붙는다 (개당 월 약 $2.75).
 
-Harbor 인증서(Let's Encrypt, DNS-01)는 첫 발급만 수동이다. 온프레미스 담당이 알려 주는 `_acme-challenge.harbor` TXT를 콘솔에서 넣고, 발급 후 지운다 (Terraform 코드에 없는 레코드라 apply가 건드리지 않는다). 그다음 `create_acme_user = true`로 apply해 자동 갱신용 사용자 `osi7-acme-harbor`를 만들고, 콘솔에서 액세스 키를 발급해 영역 ID(`zone_id` 출력)와 함께 전달한다. 이 사용자는 `acme_hosts`(harbor, shop, api, keycloak — 온프레미스 쪽 인증서)로 정한 `_acme-challenge.<호스트>.osi7.shop` TXT만 바꿀 수 있다. 이름은 harbor지만 사용자를 다시 만들면 발급한 키가 무효가 되므로 이름은 그대로 둔다. 인증서는 90일짜리이고 만료 30일 전에 갱신되므로, 첫 발급 후 60일 안에 자동화를 끝낸다.
+Harbor 인증서(Let's Encrypt, DNS-01)는 첫 발급만 수동이다. 온프레미스 담당이 알려 주는 `_acme-challenge.harbor` TXT를 콘솔에서 넣고, 발급 후 지운다 (Terraform 코드에 없는 레코드라 apply가 건드리지 않는다). 그다음 `create_acme_user = true`로 apply해 자동 갱신용 사용자 `osi7-acme-harbor`를 만들고, 콘솔에서 액세스 키를 발급해 영역 ID(`zone_id` 출력)와 함께 전달한다. 이 사용자는 `acme_hosts`(harbor, shop, api, keycloak, grafana — 온프레미스 쪽 인증서)로 정한 `_acme-challenge.<호스트>.osi7.shop` TXT만 바꿀 수 있다. 이름은 harbor지만 사용자를 다시 만들면 발급한 키가 무효가 되므로 이름은 그대로 둔다. 인증서는 90일짜리이고 만료 30일 전에 갱신되므로, 첫 발급 후 60일 안에 자동화를 끝낸다.
 
 ## 구조
 
@@ -77,12 +79,12 @@ Harbor 인증서(Let's Encrypt, DNS-01)는 첫 발급만 수동이다. 온프레
 - **network**: VPC와 2계층 × AZ 2개 서브넷 (public / private app). DB 서브넷은 없다 (DB는 온프레미스에서만 운영, 아래 참고). public·app 서브넷에는 AWS Load Balancer Controller가 쓰는 `kubernetes.io/role/(internal-)elb` 태그가 붙어 있다. NAT 개수는 `nat_gateway_count`(1 또는 2)로 정한다. app 라우트 테이블은 `min(index, count-1)`로 NAT를 고르므로, NAT가 1개면 두 AZ가 같은 NAT를 쓴다.
 - **security**: ALB / 노드 보안 그룹. ALB SG와 노드 SG가 서로를 참조하므로, 인라인 규칙 대신 `aws_vpc_security_group_*_rule` 리소스로 규칙을 따로 붙인다 (인라인으로 쓰면 순환 참조가 생긴다). 온프레미스 관련 규칙은 아직 없다 (연결 방식이 정해지면 추가). 노드로 들어오는 온프레미스 규칙(SSH, 6443)은 일부러 두지 않았다. K8s API는 EKS 컨트롤 플레인에 있고, 노드 접속은 SSM으로 한다.
 - **ecr**: `ecr_repositories`의 이름마다 `<ecr_namespace>/<이름>` 리포지토리를 만든다. 지금은 `ecommerce/` + auth, product, order, promotion, web이다. namespace는 온프레미스 Harbor 프로젝트 이름과 같게 둔다. 노드가 쓰는 pull 정책은 이 모듈에서 만들고, push 정책은 iam-users에 있다 (같은 이름 `osi7-ecr-push`를 두 곳에서 만들면 apply가 실패한다).
-- **iam**: 노드 역할(EKS worker + CNI + 프로젝트 ECR pull + AWS 관리형 `AmazonEC2ContainerRegistryPullOnly`)과 EKS 클러스터 역할을 만든다. Jenkins·ArgoCD 사용자는 iam-users에 있다.
-- **eks**: app 서브넷에 클러스터를 만든다. Secrets는 KMS로 암호화하고, 컨트롤 플레인 로그는 모든 종류를 남기며, 인증 모드는 `API_AND_CONFIG_MAP`이다. 공개 엔드포인트는 `eks_public_access_cidrs`가 비어 있지 않을 때만 켜진다. 관리형 노드 그룹은 시작 템플릿으로 IMDSv2와 hop limit 1을 강제해 파드가 노드 권한을 쓰지 못하게 한다 (파드 권한은 Pod Identity/IRSA로 부여). EBS는 암호화된 gp3를 쓴다. 노드 그룹은 `desired_size` 변경을 무시하고, 애드온은 노드 그룹이 생긴 뒤에 설치한다. 팀원 kubectl 권한은 `access_entries`로 Access Entry와 액세스 정책을 붙인다 (namespaces가 비면 클러스터 전체). AWS Load Balancer Controller의 역할(`osi7-aws-load-balancer-controller`, 공식 정책 파일 `modules/eks/policies/`에 버전 고정)과 `kube-system/aws-load-balancer-controller` Pod Identity 연결도 만든다. 컨트롤러 설치(Helm)는 Terraform 밖이고, 설치 버전을 올리면 정책 파일도 같은 버전으로 바꾼다.
+- **iam**: 노드 역할(EKS worker + CNI + 프로젝트 ECR pull + AWS 관리형 `AmazonEC2ContainerRegistryPullOnly`)과 EKS 클러스터 역할을 만든다. Jenkins·ArgoCD·Grafana 사용자는 iam-users에 있다.
+- **eks**: app 서브넷에 클러스터를 만든다. Secrets는 KMS로 암호화하고, 컨트롤 플레인 로그는 모든 종류를 남기며, 인증 모드는 `API_AND_CONFIG_MAP`이다. 공개 엔드포인트는 `eks_public_access_cidrs`가 비어 있지 않을 때만 켜진다. 관리형 노드 그룹은 시작 템플릿으로 IMDSv2와 hop limit 1을 강제해 파드가 노드 권한을 쓰지 못하게 한다 (파드 권한은 Pod Identity/IRSA로 부여). EBS는 암호화된 gp3를 쓴다. 노드 그룹은 `desired_size` 변경을 무시하고, 애드온은 노드 그룹이 생긴 뒤에 설치한다. 팀원 kubectl 권한은 `access_entries`로 Access Entry와 액세스 정책을 붙인다 (namespaces가 비면 클러스터 전체). AWS Load Balancer Controller의 역할(`osi7-aws-load-balancer-controller`, 공식 정책 파일 `modules/eks/policies/`에 버전 고정)과 `kube-system/aws-load-balancer-controller` Pod Identity 연결도 만든다. 컨트롤러 설치(Helm)는 Terraform 밖이고, 설치 버전을 올리면 정책 파일도 같은 버전으로 바꾼다. 노드·Pod 지표와 컨테이너 로그는 `amazon-cloudwatch-observability` 애드온(Container Insights, Pod Identity 역할 `osi7-cloudwatch-agent`)이 CloudWatch로 보내고, 온프레미스 Grafana가 CloudWatch에서 조회한다 (Prometheus remote_write, Loki 직접 전송은 쓰지 않음). 로그 그룹 `/aws/containerinsights/<클러스터>/*`는 보관 30일로 Terraform이 먼저 만든다 (에이전트가 만들면 무기한 보관이고 destroy해도 남음).
 
 **DB는 온프레미스에서만 운영한다** (MySQL 8.4, GTID). AWS에는 RDS도, 클라우드 백업·복제도 두지 않는다. 그래서 EKS의 서비스는 온프레미스 연결을 통해 온프레미스 DB(MySQL Router `10.50.3.100:6450`)에 접속하며, 이 연결이 끊기면 AWS 쪽 앱도 DB를 쓸 수 없다. 노드 SG의 아웃바운드는 이미 전체 허용이라 SG 변경은 필요 없고, 경로만 추가하면 된다.
 
-온프레미스 연결 방식(Site-to-Site VPN 또는 Tailscale 서브넷 라우터 등)은 아직 정해지지 않았다. 지금 온프레미스는 학원 PC의 VirtualBox VM이라 NAT가 두 겹(VirtualBox, 학원 공유기)이고 공인 IP와 포트포워딩이 없어서, Site-to-Site VPN과 온프레미스 공인 진입을 만들 수 없다. OCI로 옮기는 방안을 검토 중이다. 정해지면 그 모듈을 만들고, network의 `app_route_table_ids`에 온프레미스로 가는 경로를 넣는다. `onprem_cidr`(10.50.0.0/16)는 그때까지 어디에도 쓰지 않는다.
+온프레미스 연결 방식(Site-to-Site VPN 또는 Tailscale 서브넷 라우터 등)은 아직 정해지지 않았다. 지금 온프레미스는 학원 PC의 VirtualBox VM이라 NAT가 두 겹(VirtualBox, 학원 공유기)이고 공인 IP와 포트포워딩이 없어서, Site-to-Site VPN과 온프레미스 공인 진입을 만들 수 없다. 온프레미스 전체(앱, DB, keycloak)를 OCI로 옮기기로 했고, 옮긴 뒤 OCI 공인 IP로 Site-to-Site VPN을 만든다. 그때 그 모듈을 만들고, network의 `app_route_table_ids`에 온프레미스로 가는 경로를 넣는다. `onprem_cidr`(10.50.0.0/16)는 그때까지 어디에도 쓰지 않는다.
 
 `docs/cli/`는 멘토 권장 순서(콘솔 → CLI → 정리 → Terraform)의 기록이다. network·security·ECR 1개·노드 IAM 역할을 Terraform과 같은 이름으로 CLI 스크립트(`01`~`04`, `99-cleanup.sh`)로 만들고 지운 뒤, `snapshot.sh`로 CLI 결과와 Terraform 결과를 ID 없이 비교한다 (QA A-IAC-01). CLI로 만든 것은 `ManagedBy=cli` 태그로 구분한다. CLI 리소스와 메인 Terraform을 동시에 올리면 같은 이름의 VPC가 두 개 생기므로, 반드시 정리한 뒤 apply한다. Terraform 모듈의 이름·규칙을 바꾸면 이 스크립트도 같이 맞춘다.
 

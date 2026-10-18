@@ -9,16 +9,22 @@ data "aws_route53_zone" "this" {
   private_zone = false
 }
 
-# Harbor는 온프레미스 harbor-01에 있고 Tailscale IP로 접속한다 (tailnet 안의 기기에서만 연결됨)
-resource "aws_route53_record" "harbor" {
-  #checkov:skip=CKV2_AWS_23:AWS 리소스가 아니라 온프레미스 Harbor의 Tailscale IP를 가리키는 레코드
-  count = var.harbor_ip == "" ? 0 : 1
+# Harbor(harbor-01), Grafana(mon-ubuntu) 등 Tailscale IP로 접속하는 온프레미스 호스트 (tailnet 안의 기기에서만 연결됨)
+resource "aws_route53_record" "tailnet" {
+  #checkov:skip=CKV2_AWS_23:AWS 리소스가 아니라 온프레미스 호스트의 Tailscale IP를 가리키는 레코드
+  for_each = var.tailnet_hosts
 
   zone_id = data.aws_route53_zone.this.zone_id
-  name    = "harbor.${var.domain}"
+  name    = "${each.key}.${var.domain}"
   type    = "A"
   ttl     = 300
-  records = [var.harbor_ip]
+  records = [each.value]
+}
+
+# harbor_ip 하나만 받던 레코드를 tailnet_hosts로 합쳤다. 레코드를 지우고 다시 만들지 않게 주소만 옮긴다
+moved {
+  from = aws_route53_record.harbor[0]
+  to   = aws_route53_record.tailnet["harbor"]
 }
 
 # ---------------------------------------------------------------- 인증서 자동 갱신용 IAM 사용자
