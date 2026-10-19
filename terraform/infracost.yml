@@ -10,3 +10,7 @@ projects:
     name: osi7-vpn
     terraform_var_files:
       - terraform.tfvars
+  - path: egress
+    name: osi7-egress
+    terraform_var_files:
+      - terraform.tfvars
