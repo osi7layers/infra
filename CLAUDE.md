@@ -59,7 +59,7 @@ kubectl 권한은 메인의 `eks_access_entries`(같은 사용자 이름 -> EKS 
 1. 콘솔 Route 53 → 호스팅 영역 생성 → `osi7.shop`, 퍼블릭 호스팅 영역.
 2. 영역의 NS 레코드 값 4개를 가비아 도메인 관리의 **네임서버 설정**에 입력 (NS 레코드 추가가 아님, 끝의 `.`은 빼고).
 3. `nslookup -type=NS osi7.shop`에 awsdns 주소 4개가 나오면 위임 완료.
-4. `tailnet_hosts`(호스트 이름 -> Tailscale IP)에 넣고 `terraform/dns`에서 apply하면 `<호스트>.osi7.shop` A 레코드가 생긴다. 지금은 `harbor`(harbor-01)와 `grafana`(mon-ubuntu)다. Tailscale IP라 tailnet 안의 기기에서만 접속된다.
+4. `private_hosts`(호스트 이름 -> OCI private IP)에 넣고 `terraform/dns`에서 apply하면 `<호스트>.osi7.shop` A 레코드가 생긴다. 지금은 `harbor`(harbor-01 `10.0.1.94`)와 `grafana`(mon-01 `10.0.1.112`)다. OCI 이전 후 Tailscale은 쓰지 않으며, 사설 IP라 OCI VCN 안(그리고 VPN으로 연결된 AWS VPC)에서만 접속된다.
 
 AWS 쪽 진입은 LB Controller가 만든 LB(NLB → Gateway API 또는 ALB → APISIX)를 두고, TLS는 LB에서 ACM 인증서로 끝낸다. 그 인증서(`shop`, `api`, `acm_hosts` 변수)는 메인 destroy와 상관없이 남도록 `terraform/dns`가 DNS 검증으로 만들고, ARN은 `acm_certificate_arn` 출력이다. (둘 중 어느 쪽인지는 아직 미정)
 

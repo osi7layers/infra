@@ -1,7 +1,7 @@
-# Tailscale IP로 접속하는 온프레미스 호스트 (온프레미스 담당 제공). tailnet 안의 기기에서만 접속된다
-tailnet_hosts = {
-  harbor  = "100.85.182.121" # harbor-01
-  grafana = "100.93.147.31"  # mon-ubuntu (관측성)
+# OCI private IP로 접속하는 온프레미스 호스트. OCI VCN 안(그리고 VPN으로 연결된 AWS)에서만 접속된다
+private_hosts = {
+  harbor  = "10.0.1.94"  # harbor-01
+  grafana = "10.0.1.112" # mon-01 (관측성)
 }
 
 # Harbor 인증서 자동 갱신용 사용자 (첫 발급은 2026-10-14 수동 TXT로 완료)
