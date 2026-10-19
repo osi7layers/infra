@@ -23,7 +23,6 @@ locals {
   # 직접 만든 정책 (그룹 -> 정책 이름). readonly는 ReadOnlyAccess에 EKS 조회가 들어 있어 eks-read가 필요 없다
   custom_policies = {
     "network/eks-read"       = { group = "network", policy = "eks-read" }
-    "network/vpn-write"      = { group = "network", policy = "vpn-write" }
     "k8s-operator/eks-read"  = { group = "k8s-operator", policy = "eks-read" }
     "cicd/eks-read"          = { group = "cicd", policy = "eks-read" }
     "cicd/ecr-push"          = { group = "cicd", policy = "ecr-push" }
@@ -32,11 +31,10 @@ locals {
   }
 
   policy_documents = {
-    "eks-read"  = data.aws_iam_policy_document.eks_read.json
-    "vpn-write" = data.aws_iam_policy_document.vpn_write.json
-    "ecr-push"  = data.aws_iam_policy_document.ecr_push.json
-    "k6-ec2"    = data.aws_iam_policy_document.k6_ec2.json
-    "self-mfa"  = data.aws_iam_policy_document.self_mfa.json
+    "eks-read" = data.aws_iam_policy_document.eks_read.json
+    "ecr-push" = data.aws_iam_policy_document.ecr_push.json
+    "k6-ec2"   = data.aws_iam_policy_document.k6_ec2.json
+    "self-mfa" = data.aws_iam_policy_document.self_mfa.json
 
     "grafana-assume" = data.aws_iam_policy_document.grafana_assume.json
   }
@@ -214,30 +212,6 @@ data "aws_iam_policy_document" "eks_read" {
     sid       = "ListAll"
     actions   = ["eks:ListClusters", "eks:DescribeAddonVersions"]
     resources = ["*"]
-  }
-}
-
-# 광렬: VPN 구성 (VGW, CGW, VPN Connection, 라우팅). 조회는 AmazonVPCReadOnlyAccess
-data "aws_iam_policy_document" "vpn_write" {
-  statement {
-    actions = [
-      "ec2:CreateVpnGateway", "ec2:DeleteVpnGateway", "ec2:AttachVpnGateway", "ec2:DetachVpnGateway",
-      "ec2:CreateCustomerGateway", "ec2:DeleteCustomerGateway",
-      "ec2:CreateVpnConnection", "ec2:DeleteVpnConnection", "ec2:ModifyVpnConnection",
-      "ec2:ModifyVpnConnectionOptions", "ec2:ModifyVpnTunnelOptions", "ec2:ModifyVpnTunnelCertificate",
-      "ec2:CreateVpnConnectionRoute", "ec2:DeleteVpnConnectionRoute",
-      "ec2:EnableVgwRoutePropagation", "ec2:DisableVgwRoutePropagation",
-      "ec2:CreateRoute", "ec2:ReplaceRoute", "ec2:DeleteRoute",
-      "ec2:GetVpnConnectionDeviceTypes", "ec2:GetVpnConnectionDeviceSampleConfiguration",
-      "ec2:CreateTags",
-    ]
-    resources = ["*"]
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:RequestedRegion"
-      values   = [var.region]
-    }
   }
 }
 
