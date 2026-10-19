@@ -6,3 +6,7 @@ projects:
     terraform_var_files:
       - terraform.tfvars
     usage_file: infracost-usage.yml
+  - path: vpn
+    name: osi7-vpn
+    terraform_var_files:
+      - terraform.tfvars

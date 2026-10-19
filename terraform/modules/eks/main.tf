@@ -254,3 +254,17 @@ resource "aws_eks_addon" "cloudwatch_observability" {
     aws_iam_role_policy_attachment.cloudwatch_agent,
   ]
 }
+
+# ---------------------------------------------------------------- VPN 너머에서 API 접속 (프라이빗 엔드포인트)
+# 프라이빗 엔드포인트 ENI에는 EKS가 만든 클러스터 SG가 붙는다. 기본 규칙은 클러스터 SG끼리만 허용하므로
+# OCI ArgoCD가 VPN으로 들어오려면 그 대역의 443을 따로 열어야 한다.
+resource "aws_vpc_security_group_ingress_rule" "private_api" {
+  for_each = toset(var.private_api_cidrs)
+
+  security_group_id = aws_eks_cluster.this.vpc_config[0].cluster_security_group_id
+  description       = "Kubernetes API from ${each.value} (VPN)"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_ipv4         = each.value
+}
