@@ -118,6 +118,14 @@ resource "aws_iam_group_policy_attachment" "self_mfa" {
   policy_arn = aws_iam_policy.this["self-mfa"].arn
 }
 
+# 모든 그룹: aws login(브라우저 로그인으로 CLI 임시 자격 증명 받기). 이 권한이 없으면 세션 선택 후 400 Bad Request가 난다
+resource "aws_iam_group_policy_attachment" "cli_login" {
+  for_each = toset(local.groups)
+
+  group      = aws_iam_group.this[each.key].name
+  policy_arn = "arn:aws:iam::aws:policy/SignInLocalDevelopmentAccess"
+}
+
 # ---------------------------------------------------------------- 서비스 계정 (사람이 아닌 프로그램용)
 # 온프레미스의 Jenkins, ArgoCD, Grafana가 액세스 키로 쓴다. 팀원 그룹(local.groups)에 넣지 않는 이유는
 # 자기 자격 증명 관리 정책(self-mfa)이 붙지 않게 하려고다. 액세스 키는 콘솔에서 발급해 각 담당에게 전달한다.
