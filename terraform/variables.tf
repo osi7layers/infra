@@ -95,9 +95,9 @@ variable "eks_kubernetes_version" {
 }
 
 variable "eks_public_access_cidrs" {
-  description = "EKS API 공개 접근 허용 CIDR (팀원/온프레미스 공인 IP/32). 비우면 VPC·VPN 안에서만 접근"
+  description = "EKS API 공개 접근 허용 CIDR (팀원/온프레미스 공인 IP/32). 비우면 VPC 안에서만 접근"
   type        = list(string)
-  default     = []
+  default     = ["140.238.24.33/32"]
 }
 
 variable "eks_node_instance_types" {

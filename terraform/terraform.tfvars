@@ -27,8 +27,10 @@ ecr_force_delete         = true
 # EKS (AWS 쿠버네티스는 EKS로 확정)
 eks_kubernetes_version = "1.36"          # 온프레미스 1.36.5와 같은 마이너 버전 (EKS는 패치 버전을 AWS가 관리)
 eks_service_cidr       = "172.20.0.0/16" # 생성 후 변경 불가. 온프레미스 VCN 10.0.0.0/16, Pod 10.233.64.0/18, Service 10.233.0.0/18과 겹치지 않게
-# API 서버 공개 접근 허용 IP. 팀원 공인 IP/32, 온프레미스 NAT 공인 IP/32를 넣는다. 비우면 VPC/VPN 안에서만 접근
-eks_public_access_cidrs = []
+# API 서버 공개 접근 허용 IP. 팀원 공인 IP/32, 온프레미스 NAT 공인 IP/32를 넣는다. 비우면 VPC 안에서만 접근
+eks_public_access_cidrs = [
+  "140.238.24.33/32", # OCI private 서브넷 NAT Gateway (ArgoCD가 도는 cp-01, wk-01/02의 출구)
+]
 # 노드: 앱 Pod가 메모리 512Mi를 요청해 t3.small(2GiB)은 부족 (예찬님 계산: 평소 앱 requests CPU 2.2 / 4.5Gi, 최대 3.7 / 7.5Gi + 시스템)
 # Free plan에서 쓸 수 있는 m7i-flex.large(2 vCPU / 8GiB)로 평소 2대, 최대 3대. 유료 플랜 전환 후 필요한 사양으로 변경
 eks_node_instance_types = ["m7i-flex.large"]
