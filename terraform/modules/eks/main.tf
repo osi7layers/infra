@@ -42,6 +42,11 @@ resource "aws_eks_cluster" "this" {
 
   enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
 
+  # 비워 두면 EKS가 VPC 대역을 보고 자동으로 고른다. 온프레미스와 VPN으로 이을 때 겹치지 않게 명시한다
+  kubernetes_network_config {
+    service_ipv4_cidr = var.service_ipv4_cidr
+  }
+
   vpc_config {
     subnet_ids              = var.subnet_ids
     endpoint_private_access = true

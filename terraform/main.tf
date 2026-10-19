@@ -42,6 +42,7 @@ module "eks" {
   project             = var.project
   cluster_name        = "${var.project}-eks"
   kubernetes_version  = var.eks_kubernetes_version
+  service_ipv4_cidr   = var.eks_service_cidr
   subnet_ids          = module.network.app_subnet_ids
   cluster_role_arn    = module.iam.eks_cluster_role_arn
   node_role_arn       = module.iam.node_role_arn

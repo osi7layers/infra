@@ -7,6 +7,12 @@ variable "cluster_name" {
   type        = string
 }
 
+variable "service_ipv4_cidr" {
+  description = "Service(ClusterIP) 대역. 클러스터를 만든 뒤에는 바꿀 수 없다"
+  type        = string
+  default     = "172.20.0.0/16"
+}
+
 variable "kubernetes_version" {
   description = "쿠버네티스 마이너 버전 (예: 1.36). 패치 버전은 EKS가 관리"
   type        = string
