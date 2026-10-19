@@ -9,10 +9,11 @@ data "aws_route53_zone" "this" {
   private_zone = false
 }
 
-# Harbor(harbor-01), Grafana(mon-ubuntu) 등 Tailscale IP로 접속하는 온프레미스 호스트 (tailnet 안의 기기에서만 연결됨)
-resource "aws_route53_record" "tailnet" {
-  #checkov:skip=CKV2_AWS_23:AWS 리소스가 아니라 온프레미스 호스트의 Tailscale IP를 가리키는 레코드
-  for_each = var.tailnet_hosts
+# Harbor(harbor-01), Grafana(mon-01) 등 OCI private IP로 접속하는 온프레미스 호스트.
+# 공개 영역에 사설 IP를 적는 것이라 OCI VCN 안(그리고 VPN으로 연결된 AWS VPC)에서만 접속된다
+resource "aws_route53_record" "private" {
+  #checkov:skip=CKV2_AWS_23:AWS 리소스가 아니라 온프레미스 호스트의 OCI private IP를 가리키는 레코드
+  for_each = var.private_hosts
 
   zone_id = data.aws_route53_zone.this.zone_id
   name    = "${each.key}.${var.domain}"
@@ -21,10 +22,10 @@ resource "aws_route53_record" "tailnet" {
   records = [each.value]
 }
 
-# harbor_ip 하나만 받던 레코드를 tailnet_hosts로 합쳤다. 레코드를 지우고 다시 만들지 않게 주소만 옮긴다
+# OCI 이전 후 Tailscale을 쓰지 않아 tailnet -> private로 이름을 바꿨다. 레코드를 지우고 다시 만들지 않게 주소만 옮긴다
 moved {
-  from = aws_route53_record.harbor[0]
-  to   = aws_route53_record.tailnet["harbor"]
+  from = aws_route53_record.tailnet
+  to   = aws_route53_record.private
 }
 
 # ---------------------------------------------------------------- 인증서 자동 갱신용 IAM 사용자

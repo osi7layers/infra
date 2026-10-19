@@ -16,14 +16,14 @@ variable "domain" {
   default     = "osi7.shop"
 }
 
-variable "tailnet_hosts" {
-  description = "Tailscale IP로 접속하는 온프레미스 호스트 (호스트 이름 -> Tailscale IP 100.x.x.x). <호스트>.<domain> A 레코드를 만든다"
+variable "private_hosts" {
+  description = "OCI private IP로 접속하는 온프레미스 호스트 (호스트 이름 -> 10.0.1.x). <호스트>.<domain> A 레코드를 만든다"
   type        = map(string)
   default     = {}
 
   validation {
-    condition     = alltrue([for ip in values(var.tailnet_hosts) : can(cidrhost("${ip}/32", 0))])
-    error_message = "IPv4 주소 형식이어야 합니다 (예: 100.64.0.10)."
+    condition     = alltrue([for ip in values(var.private_hosts) : can(cidrhost("${ip}/32", 0))])
+    error_message = "IPv4 주소 형식이어야 합니다 (예: 10.0.1.94)."
   }
 }
 
