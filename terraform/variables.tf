@@ -41,15 +41,15 @@ variable "nat_gateway_count" {
 }
 
 variable "node_service_port_from" {
-  description = "ALB가 Node로 보내는 서비스 포트 범위 시작. 예찬님과 확정 후 변경 (임시: NodePort 범위)"
+  description = "ALB가 APISIX Pod로 보내는 포트 범위 시작 (target-type ip라 NodePort가 아니라 Pod 포트). APISIX gateway HTTP 기본 9080"
   type        = number
-  default     = 30000
+  default     = 9080
 }
 
 variable "node_service_port_to" {
-  description = "ALB가 Node로 보내는 서비스 포트 범위 끝"
+  description = "ALB가 APISIX Pod로 보내는 포트 범위 끝"
   type        = number
-  default     = 32767
+  default     = 9080
 }
 
 variable "ecr_repositories" {

@@ -24,7 +24,7 @@ resource "aws_security_group" "node" {
 }
 
 # DB SG는 두지 않는다. DB(MySQL 8.4)는 온프레미스에서만 운영한다.
-# EKS 파드에서 온프레미스 DB로 나가는 연결은 node_all egress가 이미 허용하고, 경로는 온프레미스 연결 방식이 정해지면 추가한다.
+# EKS 파드에서 온프레미스 DB로 나가는 연결(NAT -> OCI edge-proxy 6450)은 node_all egress가 이미 허용한다.
 
 # ---------------------------------------------------------------- ALB SG
 resource "aws_vpc_security_group_ingress_rule" "alb_http" {
@@ -46,10 +46,10 @@ resource "aws_vpc_security_group_ingress_rule" "alb_https" {
   cidr_ipv4         = "0.0.0.0/0"
 }
 
-# ALB는 Node의 서비스 포트로만 내보낸다
+# ALB는 APISIX Pod 포트로만 내보낸다 (target-type ip라 대상이 노드 ENI의 Pod IP)
 resource "aws_vpc_security_group_egress_rule" "alb_to_node" {
   security_group_id            = aws_security_group.alb.id
-  description                  = "To nodes service ports"
+  description                  = "To APISIX pods"
   ip_protocol                  = "tcp"
   from_port                    = var.node_service_port_from
   to_port                      = var.node_service_port_to
@@ -59,7 +59,7 @@ resource "aws_vpc_security_group_egress_rule" "alb_to_node" {
 # ---------------------------------------------------------------- Node SG
 resource "aws_vpc_security_group_ingress_rule" "node_from_alb" {
   security_group_id            = aws_security_group.node.id
-  description                  = "Service ports from ALB"
+  description                  = "APISIX port from ALB"
   ip_protocol                  = "tcp"
   from_port                    = var.node_service_port_from
   to_port                      = var.node_service_port_to
@@ -74,7 +74,7 @@ resource "aws_vpc_security_group_ingress_rule" "node_self" {
 }
 
 # 온프레미스에서 노드로 들어오는 규칙은 두지 않는다.
-# - K8s API는 노드가 아니라 EKS 컨트롤 플레인에 있다 (온프레미스 연결이 생기면 eks 모듈에서 클러스터 SG 443을 연다)
+# - K8s API는 노드가 아니라 EKS 컨트롤 플레인에 있다 (OCI ArgoCD는 public endpoint의 허용 IP로 접속)
 # - 노드에는 SSH 키가 없다. 노드 접속이 필요하면 SSM Session Manager를 쓴다
 
 # 노드는 NAT를 통해 이미지 pull, 패키지 설치 등 외부 통신이 필요하다

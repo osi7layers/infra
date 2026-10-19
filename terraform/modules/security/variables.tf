@@ -7,7 +7,7 @@ variable "vpc_id" {
 }
 
 variable "node_service_port_from" {
-  description = "ALB가 Node로 보내는 서비스 포트 범위 시작 (NodePort 기본 30000-32767)"
+  description = "ALB가 APISIX Pod로 보내는 포트 범위 시작 (target-type ip, APISIX gateway 9080)"
   type        = number
 }
 
