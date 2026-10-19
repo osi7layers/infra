@@ -24,11 +24,11 @@ infracost breakdown --config-file infracost.yml   # 비용 추산 (infracost-usa
 
 state는 S3 버킷(`osi7-tfstate-<계정ID>`)의 `aws/terraform.tfstate`에 있고, `use_lockfile`(S3 잠금 파일)로 동시 apply를 막는다. DynamoDB는 쓰지 않는다. `backend.tf`의 `backend "s3" {}`는 일부러 비워 두었고 (backend 블록에는 변수를 쓸 수 없음), 계정마다 다른 값은 `backend.hcl`에 있다.
 
-버킷은 `terraform/bootstrap/`이 만든다. bootstrap은 별도의 Terraform 루트로, state를 로컬에 두고 계정마다 한 번만 apply한다. 버킷에는 `prevent_destroy`가 걸려 있다. 버킷 이름은 `terraform/backend.hcl`, `terraform/iam-users/backend.hcl`, `terraform/dns/backend.hcl`, `terraform/vpn/backend.hcl` 네 곳에 있다. bootstrap의 state(`terraform/bootstrap/terraform.tfstate`)는 git에 없고 bootstrap을 apply한 PC에만 있다. 다른 계정으로 옮길 때는 네 파일의 `bucket`을 bootstrap 출력값 `state_bucket_name`으로 바꾸고 `terraform init -backend-config=backend.hcl -reconfigure`를 한다 (기존 state를 옮길 거라면 `-migrate-state`).
+버킷은 `terraform/bootstrap/`이 만든다. bootstrap은 별도의 Terraform 루트로, state를 로컬에 두고 계정마다 한 번만 apply한다. 버킷에는 `prevent_destroy`가 걸려 있다. 버킷 이름은 `terraform/backend.hcl`, `terraform/iam-users/backend.hcl`, `terraform/dns/backend.hcl`, `terraform/egress/backend.hcl`, `terraform/vpn/backend.hcl`(폐기 예정) 다섯 곳에 있다. bootstrap의 state(`terraform/bootstrap/terraform.tfstate`)는 git에 없고 bootstrap을 apply한 PC에만 있다. 다른 계정으로 옮길 때는 이 파일들의 `bucket`을 bootstrap 출력값 `state_bucket_name`으로 바꾸고 `terraform init -backend-config=backend.hcl -reconfigure`를 한다 (기존 state를 옮길 거라면 `-migrate-state`).
 
 프로젝트 계정은 `918633123181`이다 (처음에는 테스트용이었고 그대로 프로젝트 계정으로 쓴다). 지금은 **Free plan**이라 프리 티어 대상 인스턴스 타입만 띄울 수 있고(그래서 노드가 `m7i-flex.large` 2~3대. t3.small은 앱 Pod 메모리 요청에 부족), 크레딧이 떨어지거나 플랜 만료일이 지나면 계정이 닫힌다. 유료 플랜으로 바꿀 예정이며, 바꾸면 `eks_node_instance_types`를 실제 사양으로 올린다. 플랜 상태와 남은 크레딧은 `aws freetier get-account-plan-state`로 본다. 메인 인프라를 켜 두면 크레딧이 빨리 줄어드니 쓰지 않을 때는 destroy한다.
 
-AWS 자격 증명: 루트와 테스트용 `sesac_cho`는 쓰지 않는다 (sesac_cho와 `sesac` 그룹은 삭제함). `aws login --profile myungho`로 로그인하고, Terraform과 CLI는 `AWS_PROFILE=terraform`(사용자 환경 변수로 설정됨)을 쓴다. `terraform` 프로필은 `credential_process`로 myungho의 로그인 세션을 읽는다. 그냥 `aws login`을 하면 `terraform` 프로필로 로그인을 시도해 실패하므로 `--profile myungho`를 꼭 붙인다. 계정 ID는 코드에 적지 않고 `aws_caller_identity`로 읽으므로, 계정마다 바뀌는 곳은 위의 `backend.hcl` 네 개뿐이다.
+AWS 자격 증명: 루트와 테스트용 `sesac_cho`는 쓰지 않는다 (sesac_cho와 `sesac` 그룹은 삭제함). `aws login --profile myungho`로 로그인하고, Terraform과 CLI는 `AWS_PROFILE=terraform`(사용자 환경 변수로 설정됨)을 쓴다. `terraform` 프로필은 `credential_process`로 myungho의 로그인 세션을 읽는다. 그냥 `aws login`을 하면 `terraform` 프로필로 로그인을 시도해 실패하므로 `--profile myungho`를 꼭 붙인다. 계정 ID는 코드에 적지 않고 `aws_caller_identity`로 읽으므로, 계정마다 바뀌는 곳은 위의 `backend.hcl`들뿐이다.
 
 ### 새 계정에서 처음 적용하기
 
@@ -59,7 +59,7 @@ kubectl 권한은 메인의 `eks_access_entries`(같은 사용자 이름 -> EKS 
 1. 콘솔 Route 53 → 호스팅 영역 생성 → `osi7.shop`, 퍼블릭 호스팅 영역.
 2. 영역의 NS 레코드 값 4개를 가비아 도메인 관리의 **네임서버 설정**에 입력 (NS 레코드 추가가 아님, 끝의 `.`은 빼고).
 3. `nslookup -type=NS osi7.shop`에 awsdns 주소 4개가 나오면 위임 완료.
-4. `private_hosts`(호스트 이름 -> OCI private IP)에 넣고 `terraform/dns`에서 apply하면 `<호스트>.osi7.shop` A 레코드가 생긴다. 지금은 `harbor`(harbor-01 `10.0.1.94`)와 `grafana`(mon-01 `10.0.1.112`)다. OCI 이전 후 Tailscale은 쓰지 않으며, 사설 IP라 OCI VCN 안(그리고 VPN으로 연결된 AWS VPC)에서만 접속된다.
+4. `private_hosts`(호스트 이름 -> OCI private IP)에 넣고 `terraform/dns`에서 apply하면 `<호스트>.osi7.shop` A 레코드가 생긴다. 지금은 `harbor`(harbor-01 `10.0.1.94`)와 `grafana`(mon-01 `10.0.1.112`)다. OCI 이전 후 Tailscale은 쓰지 않으며, 사설 IP라 OCI VCN 안에서만 접속된다.
 
 AWS 쪽 진입은 LB Controller가 만든 LB(NLB → Gateway API 또는 ALB → APISIX)를 두고, TLS는 LB에서 ACM 인증서로 끝낸다. 그 인증서(`shop`, `api`, `acm_hosts` 변수)는 메인 destroy와 상관없이 남도록 `terraform/dns`가 DNS 검증으로 만들고, ARN은 `acm_certificate_arn` 출력이다. (둘 중 어느 쪽인지는 아직 미정)
 
@@ -72,28 +72,30 @@ AWS 쪽 진입은 LB Controller가 만든 LB(NLB → Gateway API 또는 ALB → 
 
 Harbor 인증서(Let's Encrypt, DNS-01)는 첫 발급만 수동이다. 온프레미스 담당이 알려 주는 `_acme-challenge.harbor` TXT를 콘솔에서 넣고, 발급 후 지운다 (Terraform 코드에 없는 레코드라 apply가 건드리지 않는다). 그다음 `create_acme_user = true`로 apply해 자동 갱신용 사용자 `osi7-acme-harbor`를 만들고, 콘솔에서 액세스 키를 발급해 영역 ID(`zone_id` 출력)와 함께 전달한다. 이 사용자는 `acme_hosts`(harbor, shop, api, keycloak, grafana — 온프레미스 쪽 인증서)로 정한 `_acme-challenge.<호스트>.osi7.shop` TXT만 바꿀 수 있다. 이름은 harbor지만 사용자를 다시 만들면 발급한 키가 무효가 되므로 이름은 그대로 둔다. 인증서는 90일짜리이고 만료 30일 전에 갱신되므로, 첫 발급 후 60일 안에 자동화를 끝낸다.
 
-### VPN (`terraform/vpn/`)
+### 온프레미스 연결 (`terraform/egress/`, NAT + edge-proxy)
 
-OCI와의 Site-to-Site VPN(AWS VGW <-> OCI edge-proxy `132.145.89.131`의 strongSwan, IKEv2, 정적 라우팅)은 별도 루트 `terraform/vpn/`(`vpn/terraform.tfstate`)가 만든다. AWS 쪽 터널 외부 IP는 직접 정할 수 없고 VPN 연결이 살아 있는 동안만 유지되므로, 메인과 따로 두고 **프로젝트가 끝날 때까지 지우지 않는다** (OCI 보안 목록의 UDP 500/4500 허용과 strongSwan 설정을 한 번만 하려고). VGW, CGW, VPN 연결에 `prevent_destroy`가 걸려 있어 `customer_gateway_ip`나 터널 대역처럼 연결을 다시 만드는 변경은 plan에서 막힌다. VPN 연결은 켜 둔 시간만큼 과금된다 (시간당 약 $0.05, 월 약 $36). 프로젝트가 끝나면 `prevent_destroy`를 지우고 destroy한다.
+AWS와 OCI는 네트워크로 잇지 않는다 (VPN 없음). EKS의 앱은 NAT Gateway로 인터넷에 나가 OCI edge-proxy(`132.145.89.131`)의 TCP 프록시로 들어가고, edge-proxy가 OCI 안의 대상(DB NLB 등)으로 넘긴다. AWS가 닿을 수 있는 곳은 edge-proxy가 열어 둔 포트뿐이다.
 
-- 터널 트래픽 선택자는 온프레미스 `onprem_cidr`(10.0.0.0/16) <-> AWS `aws_vpc_cidr`(10.20.0.0/16)이다. OCI Pod는 노드 IP로 SNAT되어 나오므로 Pod 대역은 넣지 않는다.
-- PSK는 AWS가 생성한다. 터널 IP, PSK, strongSwan 설정 파일(`aws ec2 get-vpn-connection-device-sample-configuration`)은 apply 후 네트워크 담당에게 DM으로 전달한다.
-- OCI 쪽(네트워크 담당·멘토): private 라우트 `10.20.0.0/16 -> edge-proxy(10.0.0.47)`, edge-proxy VNIC 소스/대상 확인 끄기, public 보안 목록 UDP 500/4500, private 보안 목록과 DB 서버 iptables에 `10.20.0.0/16` -> DB 포트. SNAT 없이 라우팅하므로 DB에는 출발지가 AWS Pod IP(10.20.10.x, 10.20.11.x)로 보인다.
-- 메인은 `vpn_enabled = true`이면 `vpn-attachment` 모듈로 VGW를 Name 태그(`osi7-vgw`)로 찾아 VPC에 붙이고, app 라우트 테이블에 경로를 전파하며, EKS 클러스터 SG에 `onprem_cidr` -> 443을 연다 (OCI ArgoCD용). 메인을 destroy하면 VGW만 VPC에서 떨어지고 VPN 연결은 남는다. vpn 루트가 없으면 메인 plan이 VGW 조회 실패로 멈추므로, apply 순서는 iam-users -> dns -> vpn -> 메인이다.
+- **고정 NAT IP:** OCI 보안 목록은 AWS NAT 공인 IP/32만 허용한다. NAT의 EIP를 메인에서 만들면 apply할 때마다 IP가 바뀌므로, EIP는 별도 루트 `terraform/egress/`(`egress/terraform.tfstate`)가 만들고 **프로젝트가 끝날 때까지 지우지 않는다** (`prevent_destroy`). 공인 IPv4는 붙어 있지 않아도 시간당 $0.005(월 약 $3.6)가 나간다. IP는 `terraform/egress`의 출력 `nat_public_ips`로 보고 네트워크 담당에게 전달한다.
+- **메인:** `data "aws_eip"`로 Name 태그 `osi7-egress-eip-<번호>`를 찾아 network 모듈의 `nat_eip_allocation_ids`로 넘긴다 (비우면 모듈이 EIP를 직접 만든다. `docs/cli` 비교용 기본 동작). egress의 `nat_eip_count`는 메인 `nat_gateway_count`와 같게 둔다. egress 루트가 없으면 메인 plan이 EIP 조회 실패로 멈추므로, apply 순서는 iam-users -> dns -> egress -> 메인이다.
+- **인터넷을 지나므로** DB 연결은 MySQL TLS를 쓴다 (DB 담당). edge-proxy는 L4 프록시라 TLS를 풀지 않는다.
+- **OCI 쪽(네트워크 담당):** edge-proxy의 TCP 프록시(포트 -> 대상), public 보안 목록에 AWS NAT IP/32 -> 그 포트. DB에는 출발지가 edge-proxy로 보이므로 DB 쪽에 AWS 대역을 열 필요는 없다.
+- **ArgoCD -> EKS:** 반대 방향도 VPN 없이 EKS public endpoint로 간다. `eks_public_access_cidrs`에 OCI NAT Gateway 공인 IP/32를 넣는다.
+- `terraform/vpn/`(Site-to-Site VPN)은 이 방식으로 바꾸면서 폐기했다. `prevent_destroy`를 빼 두었으니 destroy한 뒤 폴더를 지운다.
 
 ## 구조
 
-루트 `main.tf`가 `terraform/modules/` 아래 모듈 5개와 `vpn-attachment`(위 "VPN")를 연결한다. 모듈 사이의 값은 모듈 출력으로만 주고받는다.
+루트 `main.tf`가 `terraform/modules/` 아래 모듈 5개를 연결한다. 모듈 사이의 값은 모듈 출력으로만 주고받는다.
 
-- **network**: VPC와 2계층 × AZ 2개 서브넷 (public / private app). DB 서브넷은 없다 (DB는 온프레미스에서만 운영, 아래 참고). public·app 서브넷에는 AWS Load Balancer Controller가 쓰는 `kubernetes.io/role/(internal-)elb` 태그가 붙어 있다. NAT 개수는 `nat_gateway_count`(1 또는 2)로 정한다. app 라우트 테이블은 `min(index, count-1)`로 NAT를 고르므로, NAT가 1개면 두 AZ가 같은 NAT를 쓴다.
+- **network**: VPC와 2계층 × AZ 2개 서브넷 (public / private app). DB 서브넷은 없다 (DB는 온프레미스에서만 운영, 아래 참고). public·app 서브넷에는 AWS Load Balancer Controller가 쓰는 `kubernetes.io/role/(internal-)elb` 태그가 붙어 있다. NAT 개수는 `nat_gateway_count`(1 또는 2)로 정하고, EIP는 `terraform/egress`의 고정 EIP를 받는다 (위 "온프레미스 연결"). app 라우트 테이블은 `min(index, count-1)`로 NAT를 고르므로, NAT가 1개면 두 AZ가 같은 NAT를 쓴다.
 - **security**: ALB / 노드 보안 그룹. ALB SG와 노드 SG가 서로를 참조하므로, 인라인 규칙 대신 `aws_vpc_security_group_*_rule` 리소스로 규칙을 따로 붙인다 (인라인으로 쓰면 순환 참조가 생긴다). 온프레미스 관련 규칙은 아직 없다 (연결 방식이 정해지면 추가). 노드로 들어오는 온프레미스 규칙(SSH, 6443)은 일부러 두지 않았다. K8s API는 EKS 컨트롤 플레인에 있고, 노드 접속은 SSM으로 한다.
 - **ecr**: `ecr_repositories`의 이름마다 `<ecr_namespace>/<이름>` 리포지토리를 만든다. 지금은 `ecommerce/` + auth, product, order, promotion, web이다. namespace는 온프레미스 Harbor 프로젝트 이름과 같게 둔다. 노드가 쓰는 pull 정책은 이 모듈에서 만들고, push 정책은 iam-users에 있다 (같은 이름 `osi7-ecr-push`를 두 곳에서 만들면 apply가 실패한다).
 - **iam**: 노드 역할(EKS worker + CNI + 프로젝트 ECR pull + AWS 관리형 `AmazonEC2ContainerRegistryPullOnly`)과 EKS 클러스터 역할을 만든다. Jenkins·ArgoCD·Grafana 사용자는 iam-users에 있다.
 - **eks**: app 서브넷에 클러스터를 만든다. Secrets는 KMS로 암호화하고, 컨트롤 플레인 로그는 모든 종류를 남기며, 인증 모드는 `API_AND_CONFIG_MAP`이다. 공개 엔드포인트는 `eks_public_access_cidrs`가 비어 있지 않을 때만 켜진다. 관리형 노드 그룹은 시작 템플릿으로 IMDSv2와 hop limit 1을 강제해 파드가 노드 권한을 쓰지 못하게 한다 (파드 권한은 Pod Identity/IRSA로 부여). EBS는 암호화된 gp3를 쓴다. 노드 그룹은 `desired_size` 변경을 무시하고, 애드온은 노드 그룹이 생긴 뒤에 설치한다. 팀원 kubectl 권한은 `access_entries`로 Access Entry와 액세스 정책을 붙인다 (namespaces가 비면 클러스터 전체). AWS Load Balancer Controller의 역할(`osi7-aws-load-balancer-controller`, 공식 정책 파일 `modules/eks/policies/`에 버전 고정)과 `kube-system/aws-load-balancer-controller` Pod Identity 연결도 만든다. 컨트롤러 설치(Helm)는 Terraform 밖이고, 설치 버전을 올리면 정책 파일도 같은 버전으로 바꾼다. 노드·Pod 지표와 컨테이너 로그는 `amazon-cloudwatch-observability` 애드온(Container Insights, Pod Identity 역할 `osi7-cloudwatch-agent`)이 CloudWatch로 보내고, 온프레미스 Grafana가 CloudWatch에서 조회한다 (Prometheus remote_write, Loki 직접 전송은 쓰지 않음). 로그 그룹 `/aws/containerinsights/<클러스터>/*`는 보관 30일로 Terraform이 먼저 만든다 (에이전트가 만들면 무기한 보관이고 destroy해도 남음).
 
-**DB는 온프레미스에서만 운영한다** (MySQL 8.4, GTID). AWS에는 RDS도, 클라우드 백업·복제도 두지 않는다. 그래서 EKS의 서비스는 온프레미스 연결을 통해 온프레미스 DB(OCI db-01~03)에 접속하며 (AWS 앱의 접속 주소는 `10.0.1.111:6450`, OCI 내부 NLB → MySQL Router. 앱 설정 값이라 Terraform에는 없다), 이 연결이 끊기면 AWS 쪽 앱도 DB를 쓸 수 없다. 노드 SG의 아웃바운드는 이미 전체 허용이라 SG 변경은 필요 없고, 경로만 추가하면 된다.
+**DB는 온프레미스에서만 운영한다** (MySQL 8.4, GTID). AWS에는 RDS도, 클라우드 백업·복제도 두지 않는다. 그래서 EKS의 서비스는 온프레미스 연결을 통해 온프레미스 DB(OCI db-01~03)에 접속하며 (NAT -> edge-proxy TCP 프록시 -> OCI 내부 NLB `10.0.1.111:6450` -> MySQL Router. AWS 앱이 쓸 edge-proxy 포트는 네트워크 담당 확인 중이고, 앱 설정 값이라 Terraform에는 없다), 이 연결이 끊기면 AWS 쪽 앱도 DB를 쓸 수 없다. 노드 SG의 아웃바운드는 이미 전체 허용이라 SG 변경은 필요 없다.
 
-온프레미스는 학원 PC(VirtualBox, 이중 NAT라 공인 진입 불가)에서 OCI(ap-seoul-1, VCN `demovcn` 10.0.0.0/16)로 전체 이전했다. 공인 IP는 배스천 겸 외부 진입점인 edge-proxy(`132.145.89.131`, 고정 IP, 사설 10.0.0.47) 하나뿐이고, 나머지 VM은 private 10.0.1.0/24에 있다. AWS와의 연결은 edge-proxy의 strongSwan과 맺는 Site-to-Site VPN이다 (위 "VPN"). keycloak은 VPN이 아니라 공인 `keycloak.osi7.shop`으로 접속한다. EKS Service 대역은 온프레미스(Pod 10.233.64.0/18, Service 10.233.0.0/18)와 겹치지 않게 `eks_service_cidr`(172.20.0.0/16)로 고정했다 (클러스터 생성 후 변경 불가).
+온프레미스는 학원 PC(VirtualBox, 이중 NAT라 공인 진입 불가)에서 OCI(ap-seoul-1, VCN `demovcn` 10.0.0.0/16)로 전체 이전했다. 공인 IP는 배스천 겸 외부 진입점인 edge-proxy(`132.145.89.131`, 고정 IP, 사설 10.0.0.47) 하나뿐이고, 나머지 VM은 private 10.0.1.0/24에 있다. AWS와는 네트워크로 잇지 않고 edge-proxy의 TCP 프록시로만 통신한다 (위 "온프레미스 연결"). keycloak은 공인 `keycloak.osi7.shop`으로 접속한다. EKS Service 대역은 온프레미스(Pod 10.233.64.0/18, Service 10.233.0.0/18)와 겹치지 않게 `eks_service_cidr`(172.20.0.0/16)로 고정했다 (클러스터 생성 후 변경 불가).
 
 `docs/cli/`는 멘토 권장 순서(콘솔 → CLI → 정리 → Terraform)의 기록이다. network·security·ECR 1개·노드 IAM 역할을 Terraform과 같은 이름으로 CLI 스크립트(`01`~`04`, `99-cleanup.sh`)로 만들고 지운 뒤, `snapshot.sh`로 CLI 결과와 Terraform 결과를 ID 없이 비교한다 (QA A-IAC-01). CLI로 만든 것은 `ManagedBy=cli` 태그로 구분한다. CLI 리소스와 메인 Terraform을 동시에 올리면 같은 이름의 VPC가 두 개 생기므로, 반드시 정리한 뒤 apply한다. Terraform 모듈의 이름·규칙을 바꾸면 이 스크립트도 같이 맞춘다.
 

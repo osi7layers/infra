@@ -7,6 +7,20 @@ module "network" {
   public_subnet_cidrs = var.public_subnet_cidrs
   app_subnet_cidrs    = var.app_subnet_cidrs
   nat_gateway_count   = var.nat_gateway_count
+
+  # terraform/egress가 만든 고정 EIP를 NAT에 붙인다 (OCI edge-proxy가 이 IP만 허용)
+  nat_eip_allocation_ids = data.aws_eip.nat[*].id
+}
+
+# NAT 공인 IP는 OCI 보안 목록의 허용 출발지라 바뀌면 안 된다. 그래서 EIP는 상시 루트 terraform/egress에 두고
+# 이름 태그로 찾는다. egress 루트를 먼저 apply해야 한다 (없으면 EIP 조회 실패)
+data "aws_eip" "nat" {
+  count = var.nat_gateway_count
+
+  filter {
+    name   = "tag:Name"
+    values = ["${var.project}-egress-eip-${count.index}"]
+  }
 }
 
 module "security" {
@@ -36,16 +50,6 @@ module "iam" {
   ecr_pull_policy_arn = module.ecr.pull_policy_arn
 }
 
-# terraform/vpn이 만든 VGW를 붙인다 (VPN 연결 자체는 vpn 루트에 상시 유지). vpn 루트를 먼저 apply해야 한다
-module "vpn_attachment" {
-  source = "./modules/vpn-attachment"
-  count  = var.vpn_enabled ? 1 : 0
-
-  project         = var.project
-  vpc_id          = module.network.vpc_id
-  route_table_ids = module.network.app_route_table_ids
-}
-
 module "eks" {
   source = "./modules/eks"
 
@@ -63,5 +67,4 @@ module "eks" {
   node_min_size       = var.eks_node_min_size
   node_max_size       = var.eks_node_max_size
   access_entries      = var.eks_access_entries
-  private_api_cidrs   = var.vpn_enabled ? [var.onprem_cidr] : [] # OCI ArgoCD가 VPN으로 프라이빗 엔드포인트에 접속할 때
 }

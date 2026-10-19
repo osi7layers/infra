@@ -50,8 +50,10 @@ resource "aws_subnet" "app" {
 # DB 서브넷은 두지 않는다. DB(MySQL 8.4)는 온프레미스에서만 운영하고, AWS에는 RDS도 백업 복제도 없다.
 
 # ---------------------------------------------------------------- NAT Gateway
+# nat_eip_allocation_ids를 주면 그 EIP를 쓰고 (메인 destroy 후에도 IP 유지), 비우면 여기서 만든다
 resource "aws_eip" "nat" {
-  count  = var.nat_gateway_count
+  #checkov:skip=CKV2_AWS_19:EC2가 아니라 아래 NAT Gateway에 붙는 EIP (allocation_id가 조건식이라 checkov가 연결을 못 찾음)
+  count  = length(var.nat_eip_allocation_ids) == 0 ? var.nat_gateway_count : 0
   domain = "vpc"
 
   tags = { Name = "${local.name}-nat-eip-${count.index}" }
@@ -62,7 +64,7 @@ resource "aws_eip" "nat" {
 resource "aws_nat_gateway" "this" {
   count = var.nat_gateway_count
 
-  allocation_id = aws_eip.nat[count.index].id
+  allocation_id = length(var.nat_eip_allocation_ids) == 0 ? aws_eip.nat[count.index].id : var.nat_eip_allocation_ids[count.index]
   subnet_id     = aws_subnet.public[count.index].id
 
   tags = { Name = "${local.name}-nat-${count.index}" }

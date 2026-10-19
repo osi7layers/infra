@@ -1,16 +1,16 @@
+# [폐기 예정] 온프레미스 연결을 VPN 대신 NAT(고정 EIP, terraform/egress) + OCI edge-proxy TCP 프록시로 바꿔서
+# 이 루트는 destroy한 뒤 폴더째 지운다. destroy할 수 있게 prevent_destroy를 뺐다.
+#
 # 온프레미스(OCI)와의 Site-to-Site VPN (AWS VGW <-> OCI edge-proxy의 strongSwan, IPsec).
 # EKS의 앱이 OCI DB에 이 경로로 접속한다. OCI 쪽 경로는 private 라우트 테이블의 10.20.0.0/16 -> edge-proxy.
 #
 # AWS 쪽 터널 외부 IP는 직접 정할 수 없고 VPN 연결이 살아 있는 동안만 유지된다. 그래서 메인과 따로 두고
-# 프로젝트가 끝날 때까지 지우지 않는다 (OCI 보안 목록과 strongSwan 설정을 한 번만 하려고). VPN 연결은 켜 둔
+# 프로젝트가 끝날 때까지 지우지 않으려 했다 (OCI 보안 목록과 strongSwan 설정을 한 번만 하려고). VPN 연결은 켜 둔
 # 시간만큼 과금된다 (시간당 약 $0.05). VGW는 여기서 만들고, VPC에 붙이는 것은 메인(vpn-attachment 모듈)이 한다.
 
 resource "aws_vpn_gateway" "this" {
   tags = { Name = "${var.project}-vgw" }
 
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "aws_customer_gateway" "onprem" {
@@ -20,9 +20,6 @@ resource "aws_customer_gateway" "onprem" {
 
   tags = { Name = "${var.project}-cgw-oci-edge-proxy" }
 
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "aws_vpn_connection" "onprem" {
@@ -41,10 +38,6 @@ resource "aws_vpn_connection" "onprem" {
 
   tags = { Name = "${var.project}-vpn-oci" }
 
-  # 다시 만들면 터널 IP가 바뀌어 OCI 쪽(보안 목록, strongSwan)을 다시 설정해야 한다
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "aws_vpn_connection_route" "onprem" {

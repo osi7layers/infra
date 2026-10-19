@@ -46,3 +46,8 @@ output "container_insights_log_groups" {
   description = "Container Insights 로그 그룹. 지표는 CloudWatch 네임스페이스 ContainerInsights (Grafana에서 ClusterName = 클러스터 이름으로 조회)"
   value       = module.eks.container_insights_log_groups
 }
+
+output "nat_public_ips" {
+  description = "NAT 공인 IP (terraform/egress의 고정 EIP). OCI edge-proxy가 허용하는 출발지"
+  value       = data.aws_eip.nat[*].public_ip
+}
