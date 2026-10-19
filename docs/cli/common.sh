@@ -11,8 +11,8 @@ VPC_CIDR="10.20.0.0/16"
 AZS=("ap-northeast-2a" "ap-northeast-2c")
 PUBLIC_CIDRS=("10.20.0.0/24" "10.20.1.0/24")
 APP_CIDRS=("10.20.10.0/24" "10.20.11.0/24")
-NODE_PORT_FROM=30000
-NODE_PORT_TO=32767
+NODE_PORT_FROM=9080 # APISIX gateway (ALB target-type ip)
+NODE_PORT_TO=9080
 ECR_REPO="ecommerce/web"
 ECR_KEEP=10
 

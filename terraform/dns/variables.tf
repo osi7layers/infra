@@ -40,7 +40,7 @@ variable "acme_hosts" {
 }
 
 variable "acm_hosts" {
-  description = "AWS 쪽 LB(NLB 또는 ALB)에 붙일 ACM 인증서의 호스트 이름 (첫 번째가 대표 이름, 나머지는 SAN)"
+  description = "AWS 쪽 ALB에 붙일 ACM 인증서의 호스트 이름 (첫 번째가 대표 이름, 나머지는 SAN)"
   type        = list(string)
   default     = ["shop", "api"]
 
@@ -101,7 +101,7 @@ variable "aws_ingress_enabled" {
 }
 
 variable "aws_lb_tags" {
-  description = "AWS 쪽 LB를 찾는 태그 (정확히 1개만 맞아야 함). LB가 여러 개면 service.k8s.aws/stack(NLB) 또는 ingress.k8s.aws/stack(ALB) 태그를 추가"
+  description = "AWS 쪽 LB를 찾는 태그 (정확히 1개만 맞아야 함). ALB가 여러 개면 ingress.k8s.aws/stack(IngressGroup 이름) 태그를 추가"
   type        = map(string)
   default     = { "elbv2.k8s.aws/cluster" = "osi7-eks" }
 }

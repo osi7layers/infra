@@ -117,8 +117,8 @@ data "aws_iam_policy_document" "acme" {
 }
 
 # ---------------------------------------------------------------- AWS 쪽 HTTPS 인증서 (ACM)
-# EKS 앞단 LB(NLB 또는 ALB, 진입 방식 미정)의 TLS 리스너에 붙인다. 인증서 하나에 이름을 모두 넣는다.
-# ARN은 NLB면 Service annotation service.beta.kubernetes.io/aws-load-balancer-ssl-cert, ALB면 Ingress annotation alb.ingress.kubernetes.io/certificate-arn에 넣는다.
+# EKS 앞단 ALB(Ingress -> APISIX)의 HTTPS 리스너에 붙인다. 인증서 하나에 이름을 모두 넣는다.
+# ARN은 Ingress annotation alb.ingress.kubernetes.io/certificate-arn에 넣는다.
 # 메인을 destroy해도 남도록 여기 둔다. ACM 공인 인증서는 무료이고, 검증 레코드가 남아 있으면 AWS가 자동으로 갱신한다.
 # 온프레미스 쪽 같은 이름의 인증서는 Let's Encrypt(위 acme 사용자)로 따로 발급한다.
 resource "aws_acm_certificate" "aws_ingress" {
@@ -160,7 +160,7 @@ locals {
 }
 
 # AWS 쪽 LB는 Terraform이 아니라 클러스터 안의 LB Controller가 만들고 이름도 자동으로 붙인다.
-# 그래서 태그로 찾는다 (NLB든 ALB든 같음). 메인이 올라가 LB가 생긴 뒤에 aws_ingress_enabled를 켜고,
+# 그래서 태그로 찾는다. 메인이 올라가 LB가 생긴 뒤에 aws_ingress_enabled를 켜고,
 # 메인을 destroy하기 전에 끄고 apply한다 (켜 둔 채로 LB가 없어지면 plan이 조회 실패로 멈춘다).
 data "aws_lb" "ingress" {
   count = var.aws_ingress_enabled ? 1 : 0

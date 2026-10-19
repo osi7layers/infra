@@ -12,9 +12,10 @@ app_subnet_cidrs    = ["10.20.10.0/24", "10.20.11.0/24"]
 nat_gateway_count = 1
 
 
-# ALB -> Node 서비스 포트. APISIX/Gateway 포트가 정해지면 좁힌다 (임시: NodePort 범위)
-node_service_port_from = 30000
-node_service_port_to   = 32767
+# 진입: ALB(Ingress, TLS 종료, target-type ip) -> APISIX. ALB가 APISIX Pod IP로 바로 보내므로 NodePort는 열지 않는다
+# APISIX gateway HTTP 컨테이너 포트 (Helm 기본 9080, 예찬님 확인 후 확정)
+node_service_port_from = 9080
+node_service_port_to   = 9080
 
 # ECR (Harbor와 환경별로 분리. AWS 환경은 ECR 사용)
 ecr_namespace = "ecommerce" # Harbor 프로젝트 이름과 동일 (지은님 CI/CD 답변 기준)
