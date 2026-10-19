@@ -12,8 +12,11 @@ app_subnet_cidrs    = ["10.20.10.0/24", "10.20.11.0/24"]
 nat_gateway_count = 1
 
 # 온프레미스 대역 (OCI VCN demovcn, 네트워크 담당 확인). AWS 앱이 쓸 DB 주소는 확인 중
-# 지금은 쓰지 않음. VPN을 붙일 때 경로와 SG에 사용
+# VPN 정적 경로(vpn 루트)와 EKS API 443 허용에 사용
 onprem_cidr = "10.0.0.0/16"
+
+# Site-to-Site VPN (VGW <-> OCI edge-proxy strongSwan). VPN 연결은 terraform/vpn에 상시 유지하고 메인은 VGW만 붙인다
+vpn_enabled = true
 
 # ALB -> Node 서비스 포트. APISIX/Gateway 포트가 정해지면 좁힌다 (임시: NodePort 범위)
 node_service_port_from = 30000

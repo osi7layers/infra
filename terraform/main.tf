@@ -36,6 +36,16 @@ module "iam" {
   ecr_pull_policy_arn = module.ecr.pull_policy_arn
 }
 
+# terraform/vpn이 만든 VGW를 붙인다 (VPN 연결 자체는 vpn 루트에 상시 유지). vpn 루트를 먼저 apply해야 한다
+module "vpn_attachment" {
+  source = "./modules/vpn-attachment"
+  count  = var.vpn_enabled ? 1 : 0
+
+  project         = var.project
+  vpc_id          = module.network.vpc_id
+  route_table_ids = module.network.app_route_table_ids
+}
+
 module "eks" {
   source = "./modules/eks"
 
@@ -53,4 +63,5 @@ module "eks" {
   node_min_size       = var.eks_node_min_size
   node_max_size       = var.eks_node_max_size
   access_entries      = var.eks_access_entries
+  private_api_cidrs   = var.vpn_enabled ? [var.onprem_cidr] : [] # OCI ArgoCD가 VPN으로 프라이빗 엔드포인트에 접속할 때
 }

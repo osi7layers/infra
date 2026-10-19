@@ -82,3 +82,9 @@ variable "access_entries" {
   }))
   default = {}
 }
+
+variable "private_api_cidrs" {
+  description = "VPN 너머에서 프라이빗 엔드포인트(443)로 API에 접속할 대역 (예: OCI ArgoCD). 클러스터 SG에 인바운드 규칙으로 붙는다"
+  type        = list(string)
+  default     = []
+}

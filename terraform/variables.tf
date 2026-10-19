@@ -41,9 +41,15 @@ variable "nat_gateway_count" {
 }
 
 variable "onprem_cidr" {
-  description = "온프레미스(OCI VCN demovcn) 대역. public 10.0.0.0/24(edge-proxy), private 10.0.1.0/24. 지금은 어디에도 쓰지 않으며, VPN을 붙일 때 경로와 SG에 사용. VPC 대역과 겹치면 안 됨"
+  description = "온프레미스(OCI VCN demovcn) 대역. public 10.0.0.0/24(edge-proxy), private 10.0.1.0/24. VPN이 붙으면 EKS API 443 허용에 사용 (VPN 정적 경로는 terraform/vpn의 onprem_cidr). VPC 대역과 겹치면 안 됨"
   type        = string
   default     = "10.0.0.0/16"
+}
+
+variable "vpn_enabled" {
+  description = "terraform/vpn의 VGW를 VPC에 붙이고 app 라우트에 onprem_cidr 경로를 전파할지. true면 vpn 루트를 먼저 apply해야 한다 (없으면 VGW 조회 실패)"
+  type        = bool
+  default     = true
 }
 
 variable "node_service_port_from" {
