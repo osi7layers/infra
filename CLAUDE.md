@@ -24,7 +24,7 @@ infracost breakdown --config-file infracost.yml   # 비용 추산 (infracost-usa
 
 state는 S3 버킷(`osi7-tfstate-<계정ID>`)의 `aws/terraform.tfstate`에 있고, `use_lockfile`(S3 잠금 파일)로 동시 apply를 막는다. DynamoDB는 쓰지 않는다. `backend.tf`의 `backend "s3" {}`는 일부러 비워 두었고 (backend 블록에는 변수를 쓸 수 없음), 계정마다 다른 값은 `backend.hcl`에 있다.
 
-버킷은 `terraform/bootstrap/`이 만든다. bootstrap은 별도의 Terraform 루트로, state를 로컬에 두고 계정마다 한 번만 apply한다. 버킷에는 `prevent_destroy`가 걸려 있다. 버킷 이름은 `terraform/backend.hcl`, `terraform/iam-users/backend.hcl`, `terraform/dns/backend.hcl`, `terraform/egress/backend.hcl`, `terraform/vpn/backend.hcl`(폐기 예정) 다섯 곳에 있다. bootstrap의 state(`terraform/bootstrap/terraform.tfstate`)는 git에 없고 bootstrap을 apply한 PC에만 있다. 다른 계정으로 옮길 때는 이 파일들의 `bucket`을 bootstrap 출력값 `state_bucket_name`으로 바꾸고 `terraform init -backend-config=backend.hcl -reconfigure`를 한다 (기존 state를 옮길 거라면 `-migrate-state`).
+버킷은 `terraform/bootstrap/`이 만든다. bootstrap은 별도의 Terraform 루트로, state를 로컬에 두고 계정마다 한 번만 apply한다. 버킷에는 `prevent_destroy`가 걸려 있다. 버킷 이름은 `terraform/backend.hcl`, `terraform/iam-users/backend.hcl`, `terraform/dns/backend.hcl`, `terraform/egress/backend.hcl` 네 곳에 있다. bootstrap의 state(`terraform/bootstrap/terraform.tfstate`)는 git에 없고 bootstrap을 apply한 PC에만 있다. 다른 계정으로 옮길 때는 이 파일들의 `bucket`을 bootstrap 출력값 `state_bucket_name`으로 바꾸고 `terraform init -backend-config=backend.hcl -reconfigure`를 한다 (기존 state를 옮길 거라면 `-migrate-state`).
 
 프로젝트 계정은 `918633123181`이다 (처음에는 테스트용이었고 그대로 프로젝트 계정으로 쓴다). 지금은 **Free plan**이라 프리 티어 대상 인스턴스 타입만 띄울 수 있고(그래서 노드가 `m7i-flex.large` 2~3대. t3.small은 앱 Pod 메모리 요청에 부족), 크레딧이 떨어지거나 플랜 만료일이 지나면 계정이 닫힌다. 유료 플랜으로 바꿀 예정이며, 바꾸면 `eks_node_instance_types`를 실제 사양으로 올린다. 플랜 상태와 남은 크레딧은 `aws freetier get-account-plan-state`로 본다. 메인 인프라를 켜 두면 크레딧이 빨리 줄어드니 쓰지 않을 때는 destroy한다.
 
@@ -81,7 +81,7 @@ AWS와 OCI는 네트워크로 잇지 않는다 (VPN 없음). EKS의 앱은 NAT G
 - **인터넷을 지나므로** DB 연결은 MySQL TLS를 쓴다 (DB 담당). edge-proxy는 L4 프록시라 TLS를 풀지 않는다.
 - **OCI 쪽(네트워크 담당):** edge-proxy의 TCP 프록시(포트 -> 대상), public 보안 목록에 AWS NAT IP/32 -> 그 포트. DB에는 출발지가 edge-proxy로 보이므로 DB 쪽에 AWS 대역을 열 필요는 없다.
 - **ArgoCD -> EKS:** 반대 방향도 VPN 없이 EKS public endpoint로 간다. `eks_public_access_cidrs`에 OCI NAT Gateway 공인 IP/32를 넣는다.
-- `terraform/vpn/`(Site-to-Site VPN)은 이 방식으로 바꾸면서 폐기했다. `prevent_destroy`를 빼 두었으니 destroy한 뒤 폴더를 지운다.
+- Site-to-Site VPN(`terraform/vpn/`)은 이 방식으로 바꾸면서 2026-10-19에 destroy하고 폴더를 지웠다.
 
 ## 구조
 
