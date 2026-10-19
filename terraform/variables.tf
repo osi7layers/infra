@@ -41,9 +41,9 @@ variable "nat_gateway_count" {
 }
 
 variable "onprem_cidr" {
-  description = "온프레미스 대역 (네트워크 담당 확인: 10.50.0.0/16, PC1 10.50.1.0/24 · PC2 10.50.2.0/24 · PC3 10.50.3.0/24). 지금은 어디에도 쓰지 않으며, 온프레미스 연결 방식(VPN/Tailscale)이 정해지면 경로와 SG에 사용. VPC 대역과 겹치면 안 됨"
+  description = "온프레미스(OCI VCN demovcn) 대역. public 10.0.0.0/24(edge-proxy), private 10.0.1.0/24. 지금은 어디에도 쓰지 않으며, VPN을 붙일 때 경로와 SG에 사용. VPC 대역과 겹치면 안 됨"
   type        = string
-  default     = "10.50.0.0/16"
+  default     = "10.0.0.0/16"
 }
 
 variable "node_service_port_from" {
@@ -86,6 +86,12 @@ variable "ecr_namespace" {
   description = "ECR 리포지토리 이름 접두사. Harbor 프로젝트 이름과 동일하게 (CI/CD: ecommerce)"
   type        = string
   default     = "ecommerce"
+}
+
+variable "eks_service_cidr" {
+  description = "EKS Service(ClusterIP) 대역. 클러스터를 만든 뒤에는 바꿀 수 없다. VPC와 온프레미스(VCN 10.0.0.0/16, Pod 10.233.64.0/18, Service 10.233.0.0/18)와 겹치면 안 됨"
+  type        = string
+  default     = "172.20.0.0/16"
 }
 
 variable "eks_kubernetes_version" {

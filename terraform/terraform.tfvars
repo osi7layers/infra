@@ -11,9 +11,9 @@ app_subnet_cidrs    = ["10.20.10.0/24", "10.20.11.0/24"]
 
 nat_gateway_count = 1
 
-# 온프레미스 대역 (네트워크 담당 확인). DB는 PC3의 MySQL Router 10.50.3.100:6450
-# 지금은 쓰지 않음. 온프레미스 연결 방식(VPN/Tailscale)이 정해지면 경로와 SG에 사용
-onprem_cidr = "10.50.0.0/16"
+# 온프레미스 대역 (OCI VCN demovcn, 네트워크 담당 확인). AWS 앱이 쓸 DB 주소는 확인 중
+# 지금은 쓰지 않음. VPN을 붙일 때 경로와 SG에 사용
+onprem_cidr = "10.0.0.0/16"
 
 # ALB -> Node 서비스 포트. APISIX/Gateway 포트가 정해지면 좁힌다 (임시: NodePort 범위)
 node_service_port_from = 30000
@@ -28,7 +28,8 @@ ecr_keep_image_count     = 10 # push 순서 기준. 롤백할 버전은 최근 1
 ecr_force_delete         = true
 
 # EKS (AWS 쿠버네티스는 EKS로 확정)
-eks_kubernetes_version = "1.36" # 온프레미스 1.36.5와 같은 마이너 버전 (EKS는 패치 버전을 AWS가 관리)
+eks_kubernetes_version = "1.36"          # 온프레미스 1.36.5와 같은 마이너 버전 (EKS는 패치 버전을 AWS가 관리)
+eks_service_cidr       = "172.20.0.0/16" # 생성 후 변경 불가. 온프레미스 VCN 10.0.0.0/16, Pod 10.233.64.0/18, Service 10.233.0.0/18과 겹치지 않게
 # API 서버 공개 접근 허용 IP. 팀원 공인 IP/32, 온프레미스 NAT 공인 IP/32를 넣는다. 비우면 VPC/VPN 안에서만 접근
 eks_public_access_cidrs = []
 # 노드: 앱 Pod가 메모리 512Mi를 요청해 t3.small(2GiB)은 부족 (예찬님 계산: 평소 앱 requests CPU 2.2 / 4.5Gi, 최대 3.7 / 7.5Gi + 시스템)

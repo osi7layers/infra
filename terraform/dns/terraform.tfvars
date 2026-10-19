@@ -13,8 +13,8 @@ acme_hosts = ["harbor", "shop", "api", "keycloak", "grafana"]
 # AWS 쪽 LB(NLB 또는 ALB)용 ACM 인증서 (shop.osi7.shop + api.osi7.shop). 이 호스트들이 온프레미스/AWS 가중치 레코드도 된다
 acm_hosts = ["shop", "api"]
 
-# 온프레미스 진입 공인 IP (네트워크 담당 확인 대기). 비어 있으면 온프레미스 레코드를 만들지 않는다
-onprem_public_ip = ""
+# 온프레미스 진입 공인 IP (OCI edge-proxy, 고정 IP). 비어 있으면 온프레미스 레코드를 만들지 않는다
+onprem_public_ip = "132.145.89.131"
 onprem_hosts     = ["keycloak"] # 온프레미스에만 있는 호스트
 
 # 가중치 전환 단계 (온프레미스:AWS). 숫자 두 개만 바꿔 apply한다
@@ -26,5 +26,5 @@ aws_weight    = 0
 aws_ingress_enabled = false
 aws_lb_tags         = { "elbv2.k8s.aws/cluster" = "osi7-eks" }
 
-# 온프레미스 상태 검사 경로 (온프레미스 구성 후 네트워크 담당이 정함). 비우면 상태 검사 없음
+# 온프레미스 상태 검사 경로 (/healthz 200으로 확정). OCI 앱이 올라가 /healthz가 200을 주면 "/healthz"로 바꿔 apply. 비우면 상태 검사 없음
 onprem_health_check_path = ""
