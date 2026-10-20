@@ -248,6 +248,66 @@ resource "aws_eks_pod_identity_association" "lb_controller" {
   role_arn        = aws_iam_role.lb_controller.arn
 }
 
+# ---------------------------------------------------------------- Cluster Autoscaler 권한 (Pod Identity)
+# KEDA/HPA로 Pod가 늘다가 노드가 모자라면 Pending이 되므로, 노드 그룹(ASG)의 desired 수를 min~max 안에서 조정한다.
+# 컨트롤러 설치(Helm, kube-system/cluster-autoscaler, autoDiscovery.clusterName = 클러스터 이름)는 Terraform 밖이다.
+# 관리형 노드 그룹의 ASG에는 EKS가 k8s.io/cluster-autoscaler/<클러스터> = owned 태그를 자동으로 붙이므로,
+# 개수 변경·인스턴스 종료는 그 태그가 있는 ASG로만 제한한다. 노드 그룹은 desired_size 변경을 무시한다 (위 lifecycle).
+resource "aws_iam_role" "cluster_autoscaler" {
+  name               = "${var.project}-cluster-autoscaler"
+  assume_role_policy = data.aws_iam_policy_document.pod_identity_assume.json
+}
+
+data "aws_iam_policy_document" "cluster_autoscaler" {
+  #checkov:skip=CKV_AWS_356:ASG 이름은 EKS가 자동으로 붙여 미리 알 수 없어 "*"를 쓰고, 변경 작업은 k8s.io/cluster-autoscaler/<클러스터> = owned 태그 조건으로 제한함. 조회 작업은 리소스 지정 불가
+  # 출처: kubernetes/autoscaler cluster-autoscaler/cloudprovider/aws/README.md (최소 권한 예시)
+  statement {
+    sid = "ScaleOwnedNodeGroups"
+    actions = [
+      "autoscaling:SetDesiredCapacity",
+      "autoscaling:TerminateInstanceInAutoScalingGroup",
+    ]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceTag/k8s.io/cluster-autoscaler/${var.cluster_name}"
+      values   = ["owned"]
+    }
+  }
+
+  # 조회 작업은 특정 리소스에 걸 수 없어서 "*"
+  statement {
+    sid = "Describe"
+    actions = [
+      "autoscaling:DescribeAutoScalingGroups",
+      "autoscaling:DescribeAutoScalingInstances",
+      "autoscaling:DescribeLaunchConfigurations",
+      "autoscaling:DescribeScalingActivities",
+      "autoscaling:DescribeTags",
+      "ec2:DescribeImages",
+      "ec2:DescribeInstanceTypes",
+      "ec2:DescribeLaunchTemplateVersions",
+      "ec2:GetInstanceTypesFromInstanceRequirements",
+      "eks:DescribeNodegroup",
+    ]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_role_policy" "cluster_autoscaler" {
+  name   = "cluster-autoscaler"
+  role   = aws_iam_role.cluster_autoscaler.id
+  policy = data.aws_iam_policy_document.cluster_autoscaler.json
+}
+
+resource "aws_eks_pod_identity_association" "cluster_autoscaler" {
+  cluster_name    = aws_eks_cluster.this.name
+  namespace       = "kube-system"
+  service_account = "cluster-autoscaler"
+  role_arn        = aws_iam_role.cluster_autoscaler.arn
+}
+
 # ---------------------------------------------------------------- Container Insights (노드·Pod 지표, 컨테이너 로그 -> CloudWatch)
 # amazon-cloudwatch-observability 애드온이 CloudWatch 에이전트와 Fluent Bit를 설치한다 (amazon-cloudwatch 네임스페이스).
 # 온프레미스 Grafana는 이 지표와 로그를 CloudWatch 데이터 소스로 조회한다 (조회 권한은 iam-users의 osi7-grafana-read).

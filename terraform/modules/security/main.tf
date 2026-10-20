@@ -56,6 +56,16 @@ resource "aws_vpc_security_group_egress_rule" "alb_to_node" {
   referenced_security_group_id = aws_security_group.node.id
 }
 
+# ALB 대상 상태 검사는 APISIX 상태 엔드포인트(7085 /status/ready)로 간다 (Ingress annotation healthcheck-port)
+resource "aws_vpc_security_group_egress_rule" "alb_to_node_health" {
+  security_group_id            = aws_security_group.alb.id
+  description                  = "To APISIX status (health check)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.alb_health_check_port
+  to_port                      = var.alb_health_check_port
+  referenced_security_group_id = aws_security_group.node.id
+}
+
 # ---------------------------------------------------------------- Node SG
 resource "aws_vpc_security_group_ingress_rule" "node_from_alb" {
   security_group_id            = aws_security_group.node.id
@@ -63,6 +73,15 @@ resource "aws_vpc_security_group_ingress_rule" "node_from_alb" {
   ip_protocol                  = "tcp"
   from_port                    = var.node_service_port_from
   to_port                      = var.node_service_port_to
+  referenced_security_group_id = aws_security_group.alb.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "node_from_alb_health" {
+  security_group_id            = aws_security_group.node.id
+  description                  = "APISIX status port from ALB (health check)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.alb_health_check_port
+  to_port                      = var.alb_health_check_port
   referenced_security_group_id = aws_security_group.alb.id
 }
 

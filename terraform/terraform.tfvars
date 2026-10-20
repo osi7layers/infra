@@ -13,9 +13,11 @@ nat_gateway_count = 1
 
 
 # 진입: ALB(Ingress, TLS 종료, target-type ip) -> APISIX. ALB가 APISIX Pod IP로 바로 보내므로 NodePort는 열지 않는다
-# APISIX gateway HTTP 컨테이너 포트 (Helm 기본 9080, 예찬님 확인 후 확정)
+# APISIX gateway HTTP 컨테이너 포트 (9080, 예찬님 확인 완료)
 node_service_port_from = 9080
 node_service_port_to   = 9080
+# ALB 대상 상태 검사: APISIX 상태 엔드포인트 7085 /status/ready (예찬님 확인. Ingress backend는 Service apisix-gateway 포트 80)
+alb_health_check_port = 7085
 
 # ECR 리포지토리는 상시 루트 terraform/ecr에서 관리한다. 메인은 노드 Pull 권한 범위(<namespace>/*)만 쓴다
 ecr_namespace = "ecommerce" # terraform/ecr과 같게
@@ -46,6 +48,7 @@ eks_access_entries = {
   jaehak     = { policy = "AmazonEKSViewPolicy", extra_policies = { AmazonEKSEditPolicy = ["qa"] } } # 재학: QA. 전체 조회 + qa 네임스페이스에서 측정용 Pod·Job 생성/삭제
   junho      = { policy = "AmazonEKSViewPolicy", namespaces = ["ecommerce-main"] }                   # 준호: DB. 테스트 Pod가 필요하면 AmazonEKSEditPolicy
   # 온프레미스 ArgoCD가 EKS를 원격 클러스터(osi7-aws)로 등록해 쓰는 계정. 사용자는 iam-users가 만든다.
-  # ArgoCD 클러스터 시크릿의 namespaces도 ecommerce-main으로 맞춰야 한다 (권한이 그 네임스페이스에만 있음)
-  osi7-argocd = { policy = "AmazonEKSAdminPolicy", namespaces = ["ecommerce-main"] }
+  # ArgoCD 클러스터 시크릿의 namespaces도 ecommerce-main, ingress-apisix로 맞춰야 한다 (권한이 그 네임스페이스에만 있음)
+  # ingress-apisix: ALB Ingress (APISIX Service apisix-gateway와 같은 네임스페이스). APISIX 차트는 예찬님이 직접 설치
+  osi7-argocd = { policy = "AmazonEKSAdminPolicy", namespaces = ["ecommerce-main", "ingress-apisix"] }
 }

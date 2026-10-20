@@ -46,3 +46,8 @@ output "nat_gateway_ids" {
   description = "NAT Gateway ID. CloudWatch AWS/NATGateway 지표(BytesOutToDestination 등)의 NatGatewayId"
   value       = module.network.nat_gateway_ids
 }
+
+output "cluster_autoscaler_role_arn" {
+  description = "Cluster Autoscaler 역할 (Pod Identity, kube-system/cluster-autoscaler). Helm 설치 시 rbac.serviceAccount.name=cluster-autoscaler, autoDiscovery.clusterName=클러스터 이름"
+  value       = module.eks.cluster_autoscaler_role_arn
+}

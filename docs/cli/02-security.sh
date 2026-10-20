@@ -18,16 +18,18 @@ for sg in "$ALB_SG_ID" "$NODE_SG_ID"; do
     --ip-permissions '[{"IpProtocol":"-1","IpRanges":[{"CidrIp":"0.0.0.0/0"}]}]' >/dev/null
 done
 
-step "ALB SG 규칙: 인터넷 80/443 허용, 노드 서비스 포트로만 내보냄"
+step "ALB SG 규칙: 인터넷 80/443 허용, 노드 서비스 포트와 상태 검사 포트로만 내보냄"
 aws ec2 authorize-security-group-ingress --group-id "$ALB_SG_ID" --ip-permissions \
   '[{"IpProtocol":"tcp","FromPort":80,"ToPort":80,"IpRanges":[{"CidrIp":"0.0.0.0/0","Description":"HTTP from internet"}]},
     {"IpProtocol":"tcp","FromPort":443,"ToPort":443,"IpRanges":[{"CidrIp":"0.0.0.0/0","Description":"HTTPS from internet"}]}]' >/dev/null
 aws ec2 authorize-security-group-egress --group-id "$ALB_SG_ID" --ip-permissions \
-  "[{\"IpProtocol\":\"tcp\",\"FromPort\":$NODE_PORT_FROM,\"ToPort\":$NODE_PORT_TO,\"UserIdGroupPairs\":[{\"GroupId\":\"$NODE_SG_ID\",\"Description\":\"To APISIX pods\"}]}]" >/dev/null
+  "[{\"IpProtocol\":\"tcp\",\"FromPort\":$NODE_PORT_FROM,\"ToPort\":$NODE_PORT_TO,\"UserIdGroupPairs\":[{\"GroupId\":\"$NODE_SG_ID\",\"Description\":\"To APISIX pods\"}]},
+    {\"IpProtocol\":\"tcp\",\"FromPort\":$HEALTH_PORT,\"ToPort\":$HEALTH_PORT,\"UserIdGroupPairs\":[{\"GroupId\":\"$NODE_SG_ID\",\"Description\":\"To APISIX status (health check)\"}]}]" >/dev/null
 
-step "노드 SG 규칙: ALB에서 서비스 포트, 노드끼리 전체, 아웃바운드 전체(NAT)"
+step "노드 SG 규칙: ALB에서 서비스 포트·상태 검사 포트, 노드끼리 전체, 아웃바운드 전체(NAT)"
 aws ec2 authorize-security-group-ingress --group-id "$NODE_SG_ID" --ip-permissions \
   "[{\"IpProtocol\":\"tcp\",\"FromPort\":$NODE_PORT_FROM,\"ToPort\":$NODE_PORT_TO,\"UserIdGroupPairs\":[{\"GroupId\":\"$ALB_SG_ID\",\"Description\":\"APISIX port from ALB\"}]},
+    {\"IpProtocol\":\"tcp\",\"FromPort\":$HEALTH_PORT,\"ToPort\":$HEALTH_PORT,\"UserIdGroupPairs\":[{\"GroupId\":\"$ALB_SG_ID\",\"Description\":\"APISIX status port from ALB (health check)\"}]},
     {\"IpProtocol\":\"-1\",\"UserIdGroupPairs\":[{\"GroupId\":\"$NODE_SG_ID\",\"Description\":\"All traffic between nodes\"}]}]" >/dev/null
 aws ec2 authorize-security-group-egress --group-id "$NODE_SG_ID" --ip-permissions \
   '[{"IpProtocol":"-1","IpRanges":[{"CidrIp":"0.0.0.0/0","Description":"All outbound (via NAT)"}]}]' >/dev/null

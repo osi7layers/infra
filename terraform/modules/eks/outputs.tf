@@ -24,3 +24,7 @@ output "container_insights_log_groups" {
   description = "Container Insights 로그 그룹 (Grafana CloudWatch Logs 조회 대상)"
   value       = [for g in aws_cloudwatch_log_group.container_insights : g.name]
 }
+
+output "cluster_autoscaler_role_arn" {
+  value = aws_iam_role.cluster_autoscaler.arn
+}
