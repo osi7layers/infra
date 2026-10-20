@@ -10,3 +10,7 @@ projects:
     name: osi7-egress
     terraform_var_files:
       - terraform.tfvars
+  - path: ecr
+    name: osi7-ecr
+    terraform_var_files:
+      - terraform.tfvars

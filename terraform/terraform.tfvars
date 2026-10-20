@@ -17,13 +17,8 @@ nat_gateway_count = 1
 node_service_port_from = 9080
 node_service_port_to   = 9080
 
-# ECR (Harbor와 환경별로 분리. AWS 환경은 ECR 사용)
-ecr_namespace = "ecommerce" # Harbor 프로젝트 이름과 동일 (지은님 CI/CD 답변 기준)
-# Jenkins가 같은 이미지를 Harbor와 ECR에 같은 이름·태그로 push한다. web은 프론트엔드
-ecr_repositories         = ["auth", "product", "order", "promotion", "web"]
-ecr_image_tag_mutability = "IMMUTABLE"
-ecr_keep_image_count     = 10 # push 순서 기준. 롤백할 버전은 최근 10번 안에 있어야 함
-ecr_force_delete         = true
+# ECR 리포지토리는 상시 루트 terraform/ecr에서 관리한다. 메인은 노드 Pull 권한 범위(<namespace>/*)만 쓴다
+ecr_namespace = "ecommerce" # terraform/ecr과 같게
 
 # EKS (AWS 쿠버네티스는 EKS로 확정)
 eks_kubernetes_version = "1.36"          # 온프레미스 1.36.5와 같은 마이너 버전 (EKS는 패치 버전을 AWS가 관리)

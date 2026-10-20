@@ -8,6 +8,8 @@
 source "$(dirname "$0")/common.sh"
 label=${1:?사용법: ./snapshot.sh cli 또는 ./snapshot.sh terraform}
 out="$(dirname "$0")/snapshot-$label.txt"
+ecr_repo=$ECR_REPO
+[ "$label" = "terraform" ] && ecr_repo=$ECR_TF_REPO
 
 vpc=$(awsq ec2 describe-vpcs --filters Name=tag:Name,Values="$PROJECT-vpc" --query 'Vpcs[0].VpcId')
 [ "$vpc" = "None" ] && { echo "$PROJECT-vpc가 없습니다"; exit 1; }
@@ -65,10 +67,11 @@ name_of() { awsq ec2 describe-tags --filters Name=resource-id,Values="$1" Name=k
   echo; echo "## SG 설명"
   awsq ec2 describe-security-groups --filters Name=vpc-id,Values="$vpc" --query 'SecurityGroups[].[GroupName, Description]' | sort
 
-  echo; echo "## ECR $ECR_REPO (태그규칙 스캔 암호화 / 보관 개수)"
-  awsq ecr describe-repositories --repository-names "$ECR_REPO" --query 'repositories[0].[
+  # 이름은 CLI(ecommerce-cli/web)와 Terraform(ecommerce/web)이 일부러 달라서 제목에 넣지 않는다
+  echo; echo "## ECR web (태그규칙 스캔 암호화 / 보관 개수)"
+  awsq ecr describe-repositories --repository-names "$ecr_repo" --query 'repositories[0].[
       imageTagMutability, imageScanningConfiguration.scanOnPush, encryptionConfiguration.encryptionType]' 2>/dev/null || echo "(없음)"
-  aws ecr get-lifecycle-policy --repository-name "$ECR_REPO" --query lifecyclePolicyText --output text 2>/dev/null |
+  aws ecr get-lifecycle-policy --repository-name "$ecr_repo" --query lifecyclePolicyText --output text 2>/dev/null |
     tr -d '\r' | grep -o '"countNumber":[0-9]*' || echo "(정책 없음)"
 
   echo; echo "## IAM $PROJECT-node-role 연결 정책"

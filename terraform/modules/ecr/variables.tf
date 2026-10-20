@@ -25,9 +25,9 @@ variable "keep_image_count" {
 }
 
 variable "force_delete" {
-  description = "true이면 이미지가 남아 있어도 destroy 가능 (재구축 리허설용). 운영에서는 false"
+  description = "true이면 이미지가 남아 있어도 destroy 가능. false면 이미지가 있는 리포지토리는 destroy가 거부된다"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "namespace" {
