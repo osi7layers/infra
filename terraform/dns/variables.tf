@@ -36,7 +36,7 @@ variable "create_acme_user" {
 variable "acme_hosts" {
   description = "자동 갱신 사용자가 TXT를 바꿀 수 있는 호스트 이름 (_acme-challenge.<호스트>.<domain>). 온프레미스 인증서용"
   type        = list(string)
-  default     = ["harbor", "shop", "api", "keycloak", "grafana"]
+  default     = ["harbor", "shop", "api", "keycloak", "grafana", "shop.dev", "api.dev", "keycloak.dev"]
 }
 
 variable "acm_hosts" {
@@ -62,9 +62,9 @@ variable "onprem_public_ip" {
 }
 
 variable "onprem_hosts" {
-  description = "온프레미스에만 있는 호스트 (onprem_public_ip로 단순 A 레코드)"
+  description = "온프레미스에만 있는 호스트 (onprem_public_ip로 단순 A 레코드). 점이 들어가도 된다 (예: shop.dev -> shop.dev.osi7.shop)"
   type        = list(string)
-  default     = ["keycloak"]
+  default     = ["keycloak", "shop.dev", "api.dev", "keycloak.dev"]
 }
 
 variable "onprem_weight" {

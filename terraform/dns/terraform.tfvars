@@ -8,14 +8,15 @@ private_hosts = {
 create_acme_user = true
 
 # 온프레미스 인증서 자동 갱신 대상 (_acme-challenge.<호스트>.osi7.shop TXT만 바꿀 수 있음)
-acme_hosts = ["harbor", "shop", "api", "keycloak", "grafana"]
+acme_hosts = ["harbor", "shop", "api", "keycloak", "grafana", "shop.dev", "api.dev", "keycloak.dev"]
 
 # AWS 쪽 LB(NLB 또는 ALB)용 ACM 인증서 (shop.osi7.shop + api.osi7.shop). 이 호스트들이 온프레미스/AWS 가중치 레코드도 된다
 acm_hosts = ["shop", "api"]
 
 # 온프레미스 진입 공인 IP (OCI edge-proxy, 고정 IP). 비어 있으면 온프레미스 레코드를 만들지 않는다
 onprem_public_ip = "132.145.89.131"
-onprem_hosts     = ["keycloak"] # 온프레미스에만 있는 호스트
+# 온프레미스에만 있는 호스트. *.dev는 OCI 개발 환경 (web이 화면 주소 맨 앞을 api로 바꿔 API 주소를 정하므로 shop.dev / api.dev처럼 같은 단계로 맞춤)
+onprem_hosts = ["keycloak", "shop.dev", "api.dev", "keycloak.dev"]
 
 # 가중치 전환 단계 (온프레미스:AWS). 숫자 두 개만 바꿔 apply한다
 #   1단계 100:0 -> 2단계 95:5 -> 3단계 50:50 -> 4단계 0:100
