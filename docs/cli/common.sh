@@ -13,7 +13,9 @@ PUBLIC_CIDRS=("10.20.0.0/24" "10.20.1.0/24")
 APP_CIDRS=("10.20.10.0/24" "10.20.11.0/24")
 NODE_PORT_FROM=9080 # APISIX gateway (ALB target-type ip)
 NODE_PORT_TO=9080
-ECR_REPO="ecommerce/web"
+# Terraform의 ecommerce/web은 상시 루트 terraform/ecr에 늘 있어서, CLI는 이름이 겹치지 않게 접두사를 바꾼다
+ECR_REPO="ecommerce-cli/web"
+ECR_TF_REPO="ecommerce/web" # snapshot.sh terraform이 비교할 리포지토리
 ECR_KEEP=10
 
 # 만든 리소스 ID를 다음 스크립트와 정리 스크립트에 넘기는 파일 (git에 올리지 않음)

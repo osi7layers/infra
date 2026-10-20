@@ -24,7 +24,7 @@ infracost breakdown --config-file infracost.yml   # 비용 추산 (infracost-usa
 
 state는 S3 버킷(`osi7-tfstate-<계정ID>`)의 `aws/terraform.tfstate`에 있고, `use_lockfile`(S3 잠금 파일)로 동시 apply를 막는다. DynamoDB는 쓰지 않는다. `backend.tf`의 `backend "s3" {}`는 일부러 비워 두었고 (backend 블록에는 변수를 쓸 수 없음), 계정마다 다른 값은 `backend.hcl`에 있다.
 
-버킷은 `terraform/bootstrap/`이 만든다. bootstrap은 별도의 Terraform 루트로, state를 로컬에 두고 계정마다 한 번만 apply한다. 버킷에는 `prevent_destroy`가 걸려 있다. 버킷 이름은 `terraform/backend.hcl`, `terraform/iam-users/backend.hcl`, `terraform/dns/backend.hcl`, `terraform/egress/backend.hcl` 네 곳에 있다. bootstrap의 state(`terraform/bootstrap/terraform.tfstate`)는 git에 없고 bootstrap을 apply한 PC에만 있다. 다른 계정으로 옮길 때는 이 파일들의 `bucket`을 bootstrap 출력값 `state_bucket_name`으로 바꾸고 `terraform init -backend-config=backend.hcl -reconfigure`를 한다 (기존 state를 옮길 거라면 `-migrate-state`).
+버킷은 `terraform/bootstrap/`이 만든다. bootstrap은 별도의 Terraform 루트로, state를 로컬에 두고 계정마다 한 번만 apply한다. 버킷에는 `prevent_destroy`가 걸려 있다. 버킷 이름은 `terraform/backend.hcl`, `terraform/iam-users/backend.hcl`, `terraform/dns/backend.hcl`, `terraform/egress/backend.hcl`, `terraform/ecr/backend.hcl` 다섯 곳에 있다. bootstrap의 state(`terraform/bootstrap/terraform.tfstate`)는 git에 없고 bootstrap을 apply한 PC에만 있다. 다른 계정으로 옮길 때는 이 파일들의 `bucket`을 bootstrap 출력값 `state_bucket_name`으로 바꾸고 `terraform init -backend-config=backend.hcl -reconfigure`를 한다 (기존 state를 옮길 거라면 `-migrate-state`).
 
 프로젝트 계정은 `918633123181`이다 (처음에는 테스트용이었고 그대로 프로젝트 계정으로 쓴다). 지금은 **Free plan**이라 프리 티어 대상 인스턴스 타입만 띄울 수 있고(그래서 노드가 `m7i-flex.large` 2~3대. t3.small은 앱 Pod 메모리 요청에 부족), 크레딧이 떨어지거나 플랜 만료일이 지나면 계정이 닫힌다. 유료 플랜으로 바꿀 예정이며, 바꾸면 `eks_node_instance_types`를 실제 사양으로 올린다. 플랜 상태와 남은 크레딧은 `aws freetier get-account-plan-state`로 본다. 메인 인프라를 켜 두면 크레딧이 빨리 줄어드니 쓰지 않을 때는 destroy한다.
 
@@ -83,25 +83,29 @@ AWS와 OCI는 네트워크로 잇지 않는다 (VPN 없음). EKS의 앱은 NAT G
 - **ArgoCD -> EKS:** 반대 방향도 VPN 없이 EKS public endpoint로 간다. `eks_public_access_cidrs`에 OCI private 서브넷 NAT Gateway 공인 IP `140.238.24.33/32`를 넣었다 (cp-01, wk-01/02가 이 IP로 나감). 팀원 PC에서 kubectl을 쓰려면 그 공인 IP/32도 추가한다.
 - Site-to-Site VPN(`terraform/vpn/`)은 이 방식으로 바꾸면서 2026-10-19에 destroy하고 폴더를 지웠다.
 
+### ECR (`terraform/ecr/`)
+
+ECR 리포지토리는 별도 루트 `terraform/ecr/`(`ecr/terraform.tfstate`)가 `modules/ecr`로 만든다. 메인에 두면 테스트 후 destroy할 때마다 Jenkins가 push한 이미지가 지워지기 때문이다 (2026-10-20 메인에서 옮김. 메인에는 `removed`(destroy = false) 블록, 이쪽에는 `import` 블록이 있고, 리포지토리를 추가하기 전에 `import` 블록을 지운다). `force_delete = false`라 이미지가 남은 리포지토리는 destroy가 거부된다. 비용은 저장 용량(GB당 월 $0.10)뿐이다. 레지스트리 주소와 이미지 경로는 이 루트의 출력 `registry_url`, `repository_urls`다. 메인은 이 state를 읽지 않으므로 apply 순서와 상관없다.
+
 ## 구조
 
-루트 `main.tf`가 `terraform/modules/` 아래 모듈 5개를 연결한다. 모듈 사이의 값은 모듈 출력으로만 주고받는다.
+루트 `main.tf`가 `terraform/modules/` 아래 모듈 4개(network, security, iam, eks)를 연결한다 (ecr 모듈은 `terraform/ecr`이 쓴다). 모듈 사이의 값은 모듈 출력으로만 주고받는다.
 
 - **network**: VPC와 2계층 × AZ 2개 서브넷 (public / private app). DB 서브넷은 없다 (DB는 온프레미스에서만 운영, 아래 참고). public·app 서브넷에는 AWS Load Balancer Controller가 쓰는 `kubernetes.io/role/(internal-)elb` 태그가 붙어 있다. NAT 개수는 `nat_gateway_count`(1 또는 2)로 정하고, EIP는 `terraform/egress`의 고정 EIP를 받는다 (위 "온프레미스 연결"). app 라우트 테이블은 `min(index, count-1)`로 NAT를 고르므로, NAT가 1개면 두 AZ가 같은 NAT를 쓴다.
 - **security**: ALB / 노드 보안 그룹. ALB SG와 노드 SG가 서로를 참조하므로, 인라인 규칙 대신 `aws_vpc_security_group_*_rule` 리소스로 규칙을 따로 붙인다 (인라인으로 쓰면 순환 참조가 생긴다). ALB SG는 인터넷 80/443을 받아 노드 SG의 APISIX 포트(9080)로만 보낸다. 온프레미스 관련 규칙은 없다 (DB는 노드 아웃바운드 전체 허용으로 나감). 노드로 들어오는 온프레미스 규칙(SSH, 6443)은 일부러 두지 않았다. K8s API는 EKS 컨트롤 플레인에 있고, 노드 접속은 SSM으로 한다.
-- **ecr**: `ecr_repositories`의 이름마다 `<ecr_namespace>/<이름>` 리포지토리를 만든다. 지금은 `ecommerce/` + auth, product, order, promotion, web이다. namespace는 온프레미스 Harbor 프로젝트 이름과 같게 둔다. 노드가 쓰는 pull 정책은 이 모듈에서 만들고, push 정책은 iam-users에 있다 (같은 이름 `osi7-ecr-push`를 두 곳에서 만들면 apply가 실패한다).
-- **iam**: 노드 역할(EKS worker + CNI + 프로젝트 ECR pull + AWS 관리형 `AmazonEC2ContainerRegistryPullOnly`)과 EKS 클러스터 역할을 만든다. Jenkins·ArgoCD·Grafana 사용자는 iam-users에 있다.
+- **ecr** (`terraform/ecr`이 사용): `repositories`의 이름마다 `<namespace>/<이름>` 리포지토리를 만든다. 지금은 `ecommerce/` + auth, product, order, promotion, web이다. namespace는 온프레미스 Harbor 프로젝트 이름과 같게 둔다. 정책은 만들지 않는다. 노드 pull 정책은 iam 모듈, push 정책은 iam-users에 있다 (같은 이름의 정책을 두 곳에서 만들면 apply가 실패한다).
+- **iam**: 노드 역할(EKS worker + CNI + 프로젝트 ECR pull + AWS 관리형 `AmazonEC2ContainerRegistryPullOnly`)과 EKS 클러스터 역할을 만든다. 프로젝트 ECR pull 정책(`osi7-ecr-pull`)은 `terraform/ecr`의 state를 읽지 않도록 `repository/<ecr_namespace>/*` 범위로 여기서 만든다. Jenkins·ArgoCD·Grafana 사용자는 iam-users에 있다.
 - **eks**: app 서브넷에 클러스터를 만든다. Secrets는 KMS로 암호화하고, 컨트롤 플레인 로그는 모든 종류를 남기며, 인증 모드는 `API_AND_CONFIG_MAP`이다. 공개 엔드포인트는 `eks_public_access_cidrs`가 비어 있지 않을 때만 켜진다. 관리형 노드 그룹은 시작 템플릿으로 IMDSv2와 hop limit 1을 강제해 파드가 노드 권한을 쓰지 못하게 한다 (파드 권한은 Pod Identity/IRSA로 부여). EBS는 암호화된 gp3를 쓴다. 노드 그룹은 `desired_size` 변경을 무시하고, 애드온은 노드 그룹이 생긴 뒤에 설치한다. 팀원 kubectl 권한은 `access_entries`로 Access Entry와 액세스 정책을 붙인다 (namespaces가 비면 클러스터 전체). AWS Load Balancer Controller의 역할(`osi7-aws-load-balancer-controller`, 공식 정책 파일 `modules/eks/policies/`에 버전 고정)과 `kube-system/aws-load-balancer-controller` Pod Identity 연결도 만든다. 컨트롤러 설치(Helm)는 Terraform 밖이고, 설치 버전을 올리면 정책 파일도 같은 버전으로 바꾼다. 노드·Pod 지표와 컨테이너 로그는 `amazon-cloudwatch-observability` 애드온(Container Insights, Pod Identity 역할 `osi7-cloudwatch-agent`)이 CloudWatch로 보내고, 온프레미스 Grafana가 CloudWatch에서 조회한다 (Prometheus remote_write, Loki 직접 전송은 쓰지 않음). 로그 그룹 `/aws/containerinsights/<클러스터>/*`는 보관 30일로 Terraform이 먼저 만든다 (에이전트가 만들면 무기한 보관이고 destroy해도 남음).
 
 **DB는 온프레미스에서만 운영한다** (MySQL 8.4, GTID). AWS에는 RDS도, 클라우드 백업·복제도 두지 않는다. 그래서 EKS의 서비스는 온프레미스 연결을 통해 온프레미스 DB(OCI db-01~03)에 접속하며 (AWS 앱의 접속 주소는 `132.145.89.131:6450`. NAT -> edge-proxy TCP 프록시 6450 -> OCI 내부 NLB `10.0.1.111:6450` -> MySQL Router. 앱 설정 값이라 Terraform에는 없다), 이 연결이 끊기면 AWS 쪽 앱도 DB를 쓸 수 없다. 노드 SG의 아웃바운드는 이미 전체 허용이라 SG 변경은 필요 없다.
 
 온프레미스는 학원 PC(VirtualBox, 이중 NAT라 공인 진입 불가)에서 OCI(ap-seoul-1, VCN `demovcn` 10.0.0.0/16)로 전체 이전했다. 공인 IP는 배스천 겸 외부 진입점인 edge-proxy(`132.145.89.131`, 고정 IP, 사설 10.0.0.47) 하나뿐이고, 나머지 VM은 private 10.0.1.0/24에 있다. AWS와는 네트워크로 잇지 않고 edge-proxy의 TCP 프록시로만 통신한다 (위 "온프레미스 연결"). keycloak은 공인 `keycloak.osi7.shop`으로 접속한다. EKS Service 대역은 온프레미스(Pod 10.233.64.0/18, Service 10.233.0.0/18)와 겹치지 않게 `eks_service_cidr`(172.20.0.0/16)로 고정했다 (클러스터 생성 후 변경 불가).
 
-`docs/cli/`는 멘토 권장 순서(콘솔 → CLI → 정리 → Terraform)의 기록이다. network·security·ECR 1개·노드 IAM 역할을 Terraform과 같은 이름으로 CLI 스크립트(`01`~`04`, `99-cleanup.sh`)로 만들고 지운 뒤, `snapshot.sh`로 CLI 결과와 Terraform 결과를 ID 없이 비교한다 (QA A-IAC-01). CLI로 만든 것은 `ManagedBy=cli` 태그로 구분한다. CLI 리소스와 메인 Terraform을 동시에 올리면 같은 이름의 VPC가 두 개 생기므로, 반드시 정리한 뒤 apply한다. Terraform 모듈의 이름·규칙을 바꾸면 이 스크립트도 같이 맞춘다.
+`docs/cli/`는 멘토 권장 순서(콘솔 → CLI → 정리 → Terraform)의 기록이다. network·security·ECR 1개(`ecommerce-cli/web`. `ecommerce/web`은 `terraform/ecr`에 늘 있어서 이름만 다르게)·노드 IAM 역할을 Terraform과 같은 이름으로 CLI 스크립트(`01`~`04`, `99-cleanup.sh`)로 만들고 지운 뒤, `snapshot.sh`로 CLI 결과와 Terraform 결과를 ID 없이 비교한다 (QA A-IAC-01). CLI로 만든 것은 `ManagedBy=cli` 태그로 구분한다. CLI 리소스와 메인 Terraform을 동시에 올리면 같은 이름의 VPC가 두 개 생기므로, 반드시 정리한 뒤 apply한다. Terraform 모듈의 이름·규칙을 바꾸면 이 스크립트도 같이 맞춘다.
 
 ## 규칙
 
 - 루트 변수는 `variables.tf`에 기본값과 함께 선언하고, 같은 값을 `terraform.tfvars`에도 적는다 (`terraform.tfvars`는 팀 엑셀 '변수' 시트와 대응). 값은 `terraform.tfvars`에서 수정하고, 변수를 추가할 때는 기본값도 함께 맞춘다. 노드 서비스 포트 범위, 노드 인스턴스 타입 등은 팀원 확인을 기다리는 임시값이다.
 - 비밀 값은 `secret.auto.tfvars`에 넣는다 (gitignore 대상).
 - Checkov 예외는 `.checkov.yaml`이 아니라 해당 리소스 옆에 `#checkov:skip=CKV_...:<사유>` 주석으로 남기고, 사유를 꼭 적는다.
-- 4주짜리 학습 프로젝트라서 비용을 아끼는 설정들은 의도한 것이며, 그 이유는 skip 주석에 적혀 있다. VPC Flow Logs 미사용, 로그 30일 보관, NAT 1개, 재구축 리허설용 `ecr_force_delete = true`가 해당한다.
+- 4주짜리 학습 프로젝트라서 비용을 아끼는 설정들은 의도한 것이며, 그 이유는 skip 주석에 적혀 있다. VPC Flow Logs 미사용, 로그 30일 보관, NAT 1개가 해당한다.

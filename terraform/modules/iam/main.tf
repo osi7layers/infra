@@ -16,9 +16,39 @@ resource "aws_iam_role" "node" {
   assume_role_policy = data.aws_iam_policy_document.ec2_assume.json
 }
 
+# 프로젝트 ECR Pull 정책. 리포지토리는 상시 루트 terraform/ecr에 있어서, 그 state를 읽지 않도록
+# Push 정책(terraform/iam-users)과 같이 <namespace>/* 이름으로 범위를 정한다.
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
+data "aws_iam_policy_document" "ecr_pull" {
+  # 로그인 토큰 발급은 특정 리포지토리에 걸 수 없어서 Resource "*"가 필수다.
+  statement {
+    sid       = "GetAuthorizationToken"
+    actions   = ["ecr:GetAuthorizationToken"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid = "PullImages"
+    actions = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:BatchGetImage",
+      "ecr:GetDownloadUrlForLayer",
+    ]
+    resources = ["arn:aws:ecr:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:repository/${var.ecr_namespace}/*"]
+  }
+}
+
+resource "aws_iam_policy" "ecr_pull" {
+  name        = "${var.project}-ecr-pull"
+  description = "ECR 이미지 Pull 전용"
+  policy      = data.aws_iam_policy_document.ecr_pull.json
+}
+
 resource "aws_iam_role_policy_attachment" "node_ecr_pull" {
   role       = aws_iam_role.node.name
-  policy_arn = var.ecr_pull_policy_arn
+  policy_arn = aws_iam_policy.ecr_pull.arn
 }
 
 # EKS 관리형 노드 그룹에 필요한 AWS 관리형 정책 (노드 등록, VPC CNI)

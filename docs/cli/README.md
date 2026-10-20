@@ -11,7 +11,7 @@
 
 ## 범위
 
-네트워크(VPC, 서브넷 4개, IGW, NAT 1개, 라우트 테이블), SG 2개와 규칙, ECR 리포지토리 1개(`ecommerce/web`), IAM 노드 역할만 다룬다. EKS 클러스터와 노드 그룹은 만들고 지우는 데 각 15분 이상 걸리고 시간당 비용이 나가서 제외한다 (Terraform으로 생성·삭제를 이미 검증함).
+네트워크(VPC, 서브넷 4개, IGW, NAT 1개, 라우트 테이블), SG 2개와 규칙, ECR 리포지토리 1개(`ecommerce-cli/web`), IAM 노드 역할만 다룬다. EKS 클러스터와 노드 그룹은 만들고 지우는 데 각 15분 이상 걸리고 시간당 비용이 나가서 제외한다 (Terraform으로 생성·삭제를 이미 검증함).
 
 ## 주의
 
@@ -30,7 +30,7 @@ VPC 콘솔 → "VPC 등"의 마법사를 쓰지 말고 하나씩 만든다 (각 
 - [ ] 탄력적 IP 할당 → NAT 게이트웨이 `osi7-nat-0` (public-a)
 - [ ] 라우트 테이블 `osi7-rt-public`(0.0.0.0/0 → IGW, public 서브넷 2개 연결), `osi7-rt-app-a`·`osi7-rt-app-c`(0.0.0.0/0 → NAT, 각 app 서브넷 연결)
 - [ ] SG `osi7-alb-sg`(인바운드 80/443 0.0.0.0/0), `osi7-node-sg`(ALB SG에서 APISIX 9080, 자기 자신 전체). ALB SG 아웃바운드는 노드 SG 9080만
-- [ ] ECR `ecommerce/web` (태그 변경 불가, 푸시할 때 스캔)
+- [ ] ECR `ecommerce-cli/web` (태그 변경 불가, 푸시할 때 스캔. `ecommerce/web`은 상시 루트 `terraform/ecr`에 늘 있어서 이름을 바꾼다)
 - [ ] 화면 캡처를 남긴 뒤 **만든 반대 순서로 삭제** (ECR → SG 규칙 중 서로 참조하는 것 → SG → NAT 삭제(완료까지 대기) → EIP 해제 → 라우트 테이블 → 서브넷 → IGW 분리·삭제 → VPC)
 - [ ] `aws resourcegroupstaggingapi get-resources --tag-filters Key=ManagedBy,Values=console`이 비어 있는지 확인 (삭제한 NAT는 한동안 남아 보이므로 NAT는 `describe-nat-gateways`의 상태가 `deleted`인지로 확인)
 
@@ -51,7 +51,7 @@ cd docs/cli
 ## 4. Terraform 단계와 비교
 
 ```bash
-cd terraform && terraform apply          # 별도 터미널에서
+cd terraform && terraform apply          # 별도 터미널에서. ECR은 상시 루트 terraform/ecr에 이미 있다
 terraform plan -detailed-exitcode; echo $?   # 0이면 No changes
 cd ../docs/cli && ./snapshot.sh terraform
 diff snapshot-cli.txt snapshot-terraform.txt
@@ -59,7 +59,7 @@ diff snapshot-cli.txt snapshot-terraform.txt
 
 비교 결과는 `RECORD.md`에 적는다. 예상되는 차이는 아래뿐이다.
 
-- ECR: Terraform은 리포지토리 5개, CLI는 1개 (`ecommerce/web`만 비교). 2026-10-14 콘솔·CLI 단계는 이름이 바뀌기 전이라 `osi-shop/frontend`로 했다. 그때 찍은 `snapshot-cli.txt`와 비교하면 ECR 이름도 다르게 나온다
+- ECR: Terraform(`terraform/ecr`)은 리포지토리 5개, CLI는 1개다. CLI는 `ecommerce-cli/web`, Terraform은 `ecommerce/web`의 설정만 비교한다 (이름은 겹치지 않게 일부러 다르다). 2026-10-14 콘솔·CLI 단계는 이름이 바뀌기 전이라 `osi-shop/frontend`로 했고, 그때 찍은 `snapshot-cli.txt`에는 제목에 이름이 들어 있다
 - ECR 수명 주기 정책 설명 문구 (CLI는 Windows 한글 인코딩 문제로 영어). 보관 개수(10)는 같아야 한다
-- IAM: 프로젝트 Pull 정책(`osi7-ecr-pull`)이 Terraform은 5개 리포지토리, CLI는 1개를 대상으로 한다. 연결된 정책 이름은 같아야 한다
+- IAM: 프로젝트 Pull 정책(`osi7-ecr-pull`)이 Terraform은 `ecommerce/*`, CLI는 리포지토리 1개를 대상으로 한다. 연결된 정책 이름은 같아야 한다
 - Terraform에는 EKS가 만든 클러스터 SG(`eks-cluster-sg-...`)가 추가로 있다

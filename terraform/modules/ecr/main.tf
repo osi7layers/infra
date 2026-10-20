@@ -34,40 +34,8 @@ resource "aws_ecr_lifecycle_policy" "this" {
   })
 }
 
-# ---------------------------------------------------------------- IAM 정책 (Pull)
-locals {
-  repository_arns = [for r in aws_ecr_repository.this : r.arn]
-
-  pull_actions = [
-    "ecr:BatchCheckLayerAvailability",
-    "ecr:BatchGetImage",
-    "ecr:GetDownloadUrlForLayer",
-  ]
-}
-
-# Push 정책은 여기 두지 않는다. Jenkins와 cicd 그룹이 쓰는 osi7-ecr-push는 terraform/iam-users가
-# <namespace>/* 이름으로 만든다 (메인을 destroy해도 Jenkins 키가 남게, 같은 이름의 정책이 두 번 생기지 않게).
-
-data "aws_iam_policy_document" "pull" {
-  # 로그인 토큰 발급은 특정 리포지토리에 걸 수 없어서 Resource "*"가 필수다.
-  statement {
-    sid       = "GetAuthorizationToken"
-    actions   = ["ecr:GetAuthorizationToken"]
-    resources = ["*"]
-  }
-
-  statement {
-    sid       = "PullImages"
-    actions   = local.pull_actions
-    resources = local.repository_arns
-  }
-}
-
-resource "aws_iam_policy" "pull" {
-  name        = "${var.project}-ecr-pull"
-  description = "ECR 이미지 Pull 전용"
-  policy      = data.aws_iam_policy_document.pull.json
-}
+# Pull 정책(노드용)은 메인의 iam 모듈에, Push 정책(Jenkins, cicd 그룹)은 terraform/iam-users에 있다.
+# 이 모듈은 상시 루트 terraform/ecr이 쓰므로, 여기서 정책을 만들면 메인 destroy와 생명 주기가 달라진다.
 
 # ---------------------------------------------------------------- 레지스트리 주소 (Jenkins 로그인, GitOps 이미지 경로용)
 data "aws_caller_identity" "current" {}

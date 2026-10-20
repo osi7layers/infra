@@ -32,22 +32,35 @@ module "security" {
   node_service_port_to   = var.node_service_port_to
 }
 
-module "ecr" {
-  source = "./modules/ecr"
+# ECR 리포지토리는 상시 루트 terraform/ecr에 있다 (메인을 destroy해도 Jenkins가 push한 이미지가 남게).
+# 메인 state에 있던 리포지토리는 지우지 않고 state에서만 뺀다. terraform/ecr이 import로 가져간다.
+removed {
+  from = module.ecr.aws_ecr_repository.this
 
-  project              = var.project
-  namespace            = var.ecr_namespace
-  repositories         = var.ecr_repositories
-  image_tag_mutability = var.ecr_image_tag_mutability
-  keep_image_count     = var.ecr_keep_image_count
-  force_delete         = var.ecr_force_delete
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.ecr.aws_ecr_lifecycle_policy.this
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+# 노드용 Pull 정책은 메인에 남긴다 (같은 정책을 다시 만들지 않고 iam 모듈로 옮긴다)
+moved {
+  from = module.ecr.aws_iam_policy.pull
+  to   = module.iam.aws_iam_policy.ecr_pull
 }
 
 module "iam" {
   source = "./modules/iam"
 
-  project             = var.project
-  ecr_pull_policy_arn = module.ecr.pull_policy_arn
+  project       = var.project
+  ecr_namespace = var.ecr_namespace
 }
 
 module "eks" {

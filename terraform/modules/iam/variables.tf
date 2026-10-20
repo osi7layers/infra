@@ -2,7 +2,7 @@ variable "project" {
   type = string
 }
 
-variable "ecr_pull_policy_arn" {
-  description = "노드(EC2)에 붙일 ECR Pull 정책"
+variable "ecr_namespace" {
+  description = "노드가 Pull할 ECR 리포지토리 이름 접두사 (terraform/ecr의 namespace와 같게. 예: ecommerce -> ecommerce/*)"
   type        = string
 }
