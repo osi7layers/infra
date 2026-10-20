@@ -20,8 +20,8 @@ onprem_public_ip = "132.145.89.131"
 # web이 화면 주소 맨 앞을 api로 바꿔 API 주소를 정하므로 개발도 shop.dev / api.dev처럼 같은 단계로 맞춤)
 onprem_hosts = ["keycloak", "*.dev"]
 
-# 가중치 전환 단계 (온프레미스:AWS). 숫자 두 개만 바꿔 apply한다
-#   1단계 100:0 -> 2단계 95:5 -> 3단계 50:50 -> 4단계 0:100
+# 가중치 (온프레미스:AWS). 평소 값은 여기, QA 전환 단계는 weights/ 파일로 apply한다
+#   terraform apply -var-file=weights/50-50.tfvars   (롤백: weights/100-0.tfvars)
 onprem_weight = 100
 aws_weight    = 0
 
@@ -31,3 +31,6 @@ aws_lb_tags         = { "elbv2.k8s.aws/cluster" = "osi7-eks" }
 
 # 온프레미스 상태 검사 경로 (/healthz 200으로 확정). OCI 앱이 올라가 /healthz가 200을 주면 "/healthz"로 바꿔 apply. 비우면 상태 검사 없음
 onprem_health_check_path = ""
+# 상태 검사 간격(초, 30 또는 10)과 실패 횟수. 감지 시간은 대략 간격 x 횟수 (QA 간격별 비교용)
+onprem_health_check_interval          = 30
+onprem_health_check_failure_threshold = 3

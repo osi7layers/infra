@@ -168,7 +168,8 @@ data "aws_lb" "ingress" {
   tags = var.aws_lb_tags
 }
 
-# 온프레미스 진입 공인 IP 상태 검사. AWS 밖 대상 + HTTPS라 개당 월 약 $2.75
+# 온프레미스 진입 공인 IP 상태 검사. AWS 밖 대상 + HTTPS라 개당 월 약 $2.75 (10초 간격이면 약 $2 추가)
+# request_interval은 바꾸면 상태 검사를 새로 만든다 (AWS가 수정을 지원하지 않음)
 resource "aws_route53_health_check" "onprem" {
   for_each = local.onprem_health_checks ? toset(var.acm_hosts) : toset([])
 
@@ -178,8 +179,8 @@ resource "aws_route53_health_check" "onprem" {
   fqdn              = "${each.key}.${var.domain}" # SNI와 Host 헤더에 쓰인다
   enable_sni        = true
   resource_path     = var.onprem_health_check_path
-  failure_threshold = 3
-  request_interval  = 30
+  failure_threshold = var.onprem_health_check_failure_threshold
+  request_interval  = var.onprem_health_check_interval
 
   tags = { Name = "${var.project}-onprem-${each.key}" }
 }

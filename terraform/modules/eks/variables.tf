@@ -75,10 +75,11 @@ variable "node_disk_size_gb" {
 }
 
 variable "access_entries" {
-  description = "kubectl 권한을 줄 IAM 사용자 이름 -> EKS 액세스 정책(AmazonEKSClusterAdminPolicy 등)과 네임스페이스. namespaces가 비면 클러스터 전체"
+  description = "kubectl 권한을 줄 IAM 사용자 이름 -> EKS 액세스 정책(AmazonEKSClusterAdminPolicy 등)과 네임스페이스. namespaces가 비면 클러스터 전체. extra_policies는 네임스페이스에만 더 주는 정책"
   type = map(object({
-    policy     = string
-    namespaces = optional(list(string), [])
+    policy         = string
+    namespaces     = optional(list(string), [])
+    extra_policies = optional(map(list(string)), {}) # 추가 정책 -> 네임스페이스 (네임스페이스 범위로만 붙는다)
   }))
   default = {}
 }

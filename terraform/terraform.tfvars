@@ -38,13 +38,13 @@ eks_node_max_size       = 3
 # 클러스터 생성자에게 자동으로 관리자를 주지 않으므로 명호도 여기 넣는다.
 # 홍섭: kube-prometheus-stack 설치 때만 AmazonEKSClusterAdminPolicy(namespaces 없이)로 바꿔 apply하고, 설치 후 되돌린다
 eks_access_entries = {
-  myungho    = { policy = "AmazonEKSClusterAdminPolicy" }                           # 명호: IaC
-  yechan     = { policy = "AmazonEKSClusterAdminPolicy" }                           # 예찬: KEDA, Metrics Server, Argo Rollouts가 클러스터 단위 설치
-  jieun      = { policy = "AmazonEKSAdminPolicy", namespaces = ["ecommerce-main"] } # 지은: CI/CD
-  hongseop   = { policy = "AmazonEKSAdminPolicy", namespaces = ["monitoring"] }     # 홍섭: 관측성
-  kwangryeol = { policy = "AmazonEKSViewPolicy" }                                   # 광렬: 네트워크
-  jaehak     = { policy = "AmazonEKSViewPolicy" }                                   # 재학: QA
-  junho      = { policy = "AmazonEKSViewPolicy", namespaces = ["ecommerce-main"] }  # 준호: DB. 테스트 Pod가 필요하면 AmazonEKSEditPolicy
+  myungho    = { policy = "AmazonEKSClusterAdminPolicy" }                                            # 명호: IaC
+  yechan     = { policy = "AmazonEKSClusterAdminPolicy" }                                            # 예찬: KEDA, Metrics Server, Argo Rollouts가 클러스터 단위 설치
+  jieun      = { policy = "AmazonEKSAdminPolicy", namespaces = ["ecommerce-main"] }                  # 지은: CI/CD
+  hongseop   = { policy = "AmazonEKSAdminPolicy", namespaces = ["monitoring"] }                      # 홍섭: 관측성
+  kwangryeol = { policy = "AmazonEKSViewPolicy" }                                                    # 광렬: 네트워크
+  jaehak     = { policy = "AmazonEKSViewPolicy", extra_policies = { AmazonEKSEditPolicy = ["qa"] } } # 재학: QA. 전체 조회 + qa 네임스페이스에서 측정용 Pod·Job 생성/삭제
+  junho      = { policy = "AmazonEKSViewPolicy", namespaces = ["ecommerce-main"] }                   # 준호: DB. 테스트 Pod가 필요하면 AmazonEKSEditPolicy
   # 온프레미스 ArgoCD가 EKS를 원격 클러스터(osi7-aws)로 등록해 쓰는 계정. 사용자는 iam-users가 만든다.
   # ArgoCD 클러스터 시크릿의 namespaces도 ecommerce-main으로 맞춰야 한다 (권한이 그 네임스페이스에만 있음)
   osi7-argocd = { policy = "AmazonEKSAdminPolicy", namespaces = ["ecommerce-main"] }

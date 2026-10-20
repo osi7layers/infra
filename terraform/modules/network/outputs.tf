@@ -14,3 +14,8 @@ output "app_subnet_ids" {
 output "app_route_table_ids" {
   value = aws_route_table.app[*].id
 }
+
+# QA 비용·트래픽 측정용 (CloudWatch AWS/NATGateway 지표의 NatGatewayId)
+output "nat_gateway_ids" {
+  value = aws_nat_gateway.this[*].id
+}

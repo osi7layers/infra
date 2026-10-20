@@ -41,3 +41,8 @@ output "nat_public_ips" {
   description = "NAT 공인 IP (terraform/egress의 고정 EIP). OCI edge-proxy가 허용하는 출발지"
   value       = data.aws_eip.nat[*].public_ip
 }
+
+output "nat_gateway_ids" {
+  description = "NAT Gateway ID. CloudWatch AWS/NATGateway 지표(BytesOutToDestination 등)의 NatGatewayId"
+  value       = module.network.nat_gateway_ids
+}

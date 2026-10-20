@@ -100,8 +100,9 @@ variable "eks_node_max_size" {
 variable "eks_access_entries" {
   description = "팀원 kubectl 권한 (IAM 사용자 이름 -> EKS 액세스 정책, 네임스페이스). 사용자는 terraform/iam-users가 만든다"
   type = map(object({
-    policy     = string
-    namespaces = optional(list(string), [])
+    policy         = string
+    namespaces     = optional(list(string), [])
+    extra_policies = optional(map(list(string)), {}) # 추가 정책 -> 네임스페이스 (네임스페이스 범위로만 붙는다)
   }))
   default = {
     myungho     = { policy = "AmazonEKSClusterAdminPolicy" }
@@ -109,7 +110,7 @@ variable "eks_access_entries" {
     jieun       = { policy = "AmazonEKSAdminPolicy", namespaces = ["ecommerce-main"] }
     hongseop    = { policy = "AmazonEKSAdminPolicy", namespaces = ["monitoring"] }
     kwangryeol  = { policy = "AmazonEKSViewPolicy" }
-    jaehak      = { policy = "AmazonEKSViewPolicy" }
+    jaehak      = { policy = "AmazonEKSViewPolicy", extra_policies = { AmazonEKSEditPolicy = ["qa"] } }
     junho       = { policy = "AmazonEKSViewPolicy", namespaces = ["ecommerce-main"] }
     osi7-argocd = { policy = "AmazonEKSAdminPolicy", namespaces = ["ecommerce-main"] }
   }
