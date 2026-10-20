@@ -75,6 +75,8 @@ resource "aws_eks_cluster" "this" {
 
 # ---------------------------------------------------------------- 노드 그룹
 # 시작 템플릿: IMDSv2 강제, EBS 암호화, 노드 SG + 클러스터 SG 부착
+data "aws_default_tags" "this" {}
+
 resource "aws_launch_template" "node" {
   name_prefix = "${var.cluster_name}-node-"
 
@@ -99,9 +101,16 @@ resource "aws_launch_template" "node" {
     }
   }
 
+  # provider default_tags는 시작 템플릿 자체에만 붙고, 이 템플릿으로 뜨는 인스턴스·볼륨에는 전달되지 않는다.
+  # Project 태그가 있어야 Cost Explorer 비용 할당 태그로 노드 비용을 모을 수 있어서 직접 넣는다.
   tag_specifications {
     resource_type = "instance"
-    tags          = { Name = "${var.cluster_name}-node" }
+    tags          = merge(data.aws_default_tags.this.tags, { Name = "${var.cluster_name}-node" })
+  }
+
+  tag_specifications {
+    resource_type = "volume"
+    tags          = merge(data.aws_default_tags.this.tags, { Name = "${var.cluster_name}-node" })
   }
 }
 
@@ -169,6 +178,32 @@ resource "aws_eks_access_policy_association" "this" {
   access_scope {
     type       = length(each.value.namespaces) > 0 ? "namespace" : "cluster"
     namespaces = length(each.value.namespaces) > 0 ? each.value.namespaces : null
+  }
+}
+
+# 기본 정책에 더해 특정 네임스페이스에만 주는 정책 (예: 클러스터 전체 View + qa 네임스페이스 Edit)
+locals {
+  extra_access_policies = merge([
+    for user, e in var.access_entries : {
+      for policy, namespaces in e.extra_policies : "${user}/${policy}" => {
+        user       = user
+        policy     = policy
+        namespaces = namespaces
+      }
+    }
+  ]...)
+}
+
+resource "aws_eks_access_policy_association" "extra" {
+  for_each = local.extra_access_policies
+
+  cluster_name  = aws_eks_cluster.this.name
+  principal_arn = aws_eks_access_entry.this[each.value.user].principal_arn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/${each.value.policy}"
+
+  access_scope {
+    type       = "namespace"
+    namespaces = each.value.namespaces
   }
 }
 

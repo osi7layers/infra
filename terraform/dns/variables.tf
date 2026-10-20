@@ -116,3 +116,25 @@ variable "onprem_health_check_path" {
     error_message = "경로는 /로 시작해야 합니다."
   }
 }
+
+variable "onprem_health_check_interval" {
+  description = "온프레미스 상태 검사 간격(초). 30(표준) 또는 10(빠른 간격, 비용 추가). 장애 감지 시간은 대략 간격 x 실패 횟수"
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = contains([10, 30], var.onprem_health_check_interval)
+    error_message = "10 또는 30만 가능합니다."
+  }
+}
+
+variable "onprem_health_check_failure_threshold" {
+  description = "온프레미스를 비정상으로 판단할 연속 실패 횟수 (1~10)"
+  type        = number
+  default     = 3
+
+  validation {
+    condition     = var.onprem_health_check_failure_threshold >= 1 && var.onprem_health_check_failure_threshold <= 10
+    error_message = "1~10 사이여야 합니다."
+  }
+}

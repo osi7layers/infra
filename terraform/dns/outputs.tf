@@ -31,3 +31,13 @@ output "aws_lb_dns_name" {
   description = "태그로 찾은 AWS 쪽 LB 주소 (aws_ingress_enabled = false면 null)"
   value       = try(data.aws_lb.ingress[0].dns_name, null)
 }
+
+output "aws_lb_name" {
+  description = "태그로 찾은 AWS 쪽 ALB 이름. CloudWatch AWS/ApplicationELB 지표의 LoadBalancer 값은 ARN의 app/<이름>/<ID> 부분 (aws_ingress_enabled = false면 null)"
+  value       = try(data.aws_lb.ingress[0].name, null)
+}
+
+output "aws_lb_arn_suffix" {
+  description = "CloudWatch AWS/ApplicationELB 지표의 LoadBalancer 차원 값 (app/<이름>/<ID>)"
+  value       = try(data.aws_lb.ingress[0].arn_suffix, null)
+}
