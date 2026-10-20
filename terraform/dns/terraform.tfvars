@@ -9,7 +9,8 @@ create_acme_user = true
 
 # 온프레미스 인증서 자동 갱신 대상 (_acme-challenge.<호스트>.osi7.shop TXT만 바꿀 수 있음)
 # dev = 개발 환경 와일드카드 인증서 *.dev.osi7.shop (TXT 이름이 _acme-challenge.dev.osi7.shop)
-acme_hosts = ["harbor", "shop", "api", "keycloak", "grafana", "dev"]
+# *.dev = 개발 호스트별 인증서 (keycloak.dev 등, TXT 이름 _acme-challenge.<호스트>.dev.osi7.shop). 개발 주소가 늘어도 그대로 된다
+acme_hosts = ["harbor", "shop", "api", "keycloak", "grafana", "dev", "*.dev"]
 
 # AWS 쪽 LB(NLB 또는 ALB)용 ACM 인증서 (shop.osi7.shop + api.osi7.shop). 이 호스트들이 온프레미스/AWS 가중치 레코드도 된다
 acm_hosts = ["shop", "api"]

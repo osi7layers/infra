@@ -96,14 +96,16 @@ data "aws_iam_policy_document" "acme" {
     resources = [data.aws_route53_zone.this.arn]
   }
 
-  # 지정한 _acme-challenge 이름의 TXT만 만들고 지울 수 있다
+  # 지정한 _acme-challenge 이름의 TXT만 만들고 지울 수 있다.
+  # StringLike라서 acme_hosts의 "*.dev"는 _acme-challenge.<아무 이름>.dev.<domain>(개발 호스트별 인증서)에 맞고,
+  # *가 없는 이름은 그 이름에만 맞는다
   statement {
     sid       = "ChangeAcmeTxtOnly"
     actions   = ["route53:ChangeResourceRecordSets"]
     resources = [data.aws_route53_zone.this.arn]
 
     condition {
-      test     = "ForAllValues:StringEquals"
+      test     = "ForAllValues:StringLike"
       variable = "route53:ChangeResourceRecordSetsNormalizedRecordNames"
       values   = local.acme_record_names
     }
