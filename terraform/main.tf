@@ -30,6 +30,7 @@ module "security" {
   vpc_id                 = module.network.vpc_id
   node_service_port_from = var.node_service_port_from
   node_service_port_to   = var.node_service_port_to
+  alb_health_check_port  = var.alb_health_check_port
 }
 
 # ECR 리포지토리는 상시 루트 terraform/ecr에 있다 (메인을 destroy해도 Jenkins가 push한 이미지가 남게).

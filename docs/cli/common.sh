@@ -13,6 +13,7 @@ PUBLIC_CIDRS=("10.20.0.0/24" "10.20.1.0/24")
 APP_CIDRS=("10.20.10.0/24" "10.20.11.0/24")
 NODE_PORT_FROM=9080 # APISIX gateway (ALB target-type ip)
 NODE_PORT_TO=9080
+HEALTH_PORT=7085 # APISIX 상태 엔드포인트 /status/ready (ALB 대상 상태 검사)
 # Terraform의 ecommerce/web은 상시 루트 terraform/ecr에 늘 있어서, CLI는 이름이 겹치지 않게 접두사를 바꾼다
 ECR_REPO="ecommerce-cli/web"
 ECR_TF_REPO="ecommerce/web" # snapshot.sh terraform이 비교할 리포지토리

@@ -29,7 +29,7 @@ VPC 콘솔 → "VPC 등"의 마법사를 쓰지 말고 하나씩 만든다 (각 
 - [ ] 인터넷 게이트웨이 `osi7-igw` 만들고 VPC에 연결
 - [ ] 탄력적 IP 할당 → NAT 게이트웨이 `osi7-nat-0` (public-a)
 - [ ] 라우트 테이블 `osi7-rt-public`(0.0.0.0/0 → IGW, public 서브넷 2개 연결), `osi7-rt-app-a`·`osi7-rt-app-c`(0.0.0.0/0 → NAT, 각 app 서브넷 연결)
-- [ ] SG `osi7-alb-sg`(인바운드 80/443 0.0.0.0/0), `osi7-node-sg`(ALB SG에서 APISIX 9080, 자기 자신 전체). ALB SG 아웃바운드는 노드 SG 9080만
+- [ ] SG `osi7-alb-sg`(인바운드 80/443 0.0.0.0/0), `osi7-node-sg`(ALB SG에서 APISIX 9080·상태 검사 7085, 자기 자신 전체). ALB SG 아웃바운드는 노드 SG 9080·7085만
 - [ ] ECR `ecommerce-cli/web` (태그 변경 불가, 푸시할 때 스캔. `ecommerce/web`은 상시 루트 `terraform/ecr`에 늘 있어서 이름을 바꾼다)
 - [ ] 화면 캡처를 남긴 뒤 **만든 반대 순서로 삭제** (ECR → SG 규칙 중 서로 참조하는 것 → SG → NAT 삭제(완료까지 대기) → EIP 해제 → 라우트 테이블 → 서브넷 → IGW 분리·삭제 → VPC)
 - [ ] `aws resourcegroupstaggingapi get-resources --tag-filters Key=ManagedBy,Values=console`이 비어 있는지 확인 (삭제한 NAT는 한동안 남아 보이므로 NAT는 `describe-nat-gateways`의 상태가 `deleted`인지로 확인)

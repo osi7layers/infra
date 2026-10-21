@@ -52,6 +52,12 @@ variable "node_service_port_to" {
   default     = 9080
 }
 
+variable "alb_health_check_port" {
+  description = "ALB 대상 상태 검사 포트. APISIX 상태 엔드포인트(7085, /status/ready). Ingress annotation alb.ingress.kubernetes.io/healthcheck-port와 같게 둔다"
+  type        = number
+  default     = 7085
+}
+
 variable "ecr_namespace" {
   description = "노드가 Pull할 ECR 리포지토리 이름 접두사. terraform/ecr의 namespace와 같게 둔다 (Harbor 프로젝트 이름: ecommerce)"
   type        = string
@@ -112,6 +118,6 @@ variable "eks_access_entries" {
     kwangryeol  = { policy = "AmazonEKSViewPolicy" }
     jaehak      = { policy = "AmazonEKSViewPolicy", extra_policies = { AmazonEKSEditPolicy = ["qa"] } }
     junho       = { policy = "AmazonEKSViewPolicy", namespaces = ["ecommerce-main"] }
-    osi7-argocd = { policy = "AmazonEKSAdminPolicy", namespaces = ["ecommerce-main"] }
+    osi7-argocd = { policy = "AmazonEKSAdminPolicy", namespaces = ["ecommerce-main", "ingress-apisix"] }
   }
 }
