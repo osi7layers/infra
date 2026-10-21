@@ -349,3 +349,39 @@ resource "aws_eks_addon" "cloudwatch_observability" {
     aws_iam_role_policy_attachment.cloudwatch_agent,
   ]
 }
+
+# ---------------------------------------------------------------- EBS CSI 드라이버 (PVC -> EBS 볼륨)
+# 앱의 쿠폰 Redis(redis-coupon)가 PVC로 디스크를 쓴다. 드라이버가 PVC마다 EBS 볼륨을 만들고 지운다.
+# StorageClass(gp3, 암호화, 기본값)는 쿠버네티스 리소스라 scripts/install-controllers.sh가 만든다 (이 루트에는 쿠버네티스 provider가 없음).
+# 드라이버가 만든 볼륨은 Terraform state에 없어서 destroy가 지우지 않는다. 내리기 전에 PVC를 지워 볼륨을 먼저 없앤다 (CLAUDE.md 내리는 순서).
+resource "aws_iam_role" "ebs_csi" {
+  name               = "${var.project}-ebs-csi-driver"
+  assume_role_policy = data.aws_iam_policy_document.pod_identity_assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "ebs_csi" {
+  role       = aws_iam_role.ebs_csi.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}
+
+resource "aws_eks_addon" "ebs_csi" {
+  cluster_name                = aws_eks_cluster.this.name
+  addon_name                  = "aws-ebs-csi-driver"
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  # 드라이버가 만드는 볼륨에도 provider 기본 태그(Project 등)를 붙인다. 비용 할당 태그 집계와 내리기 전 남은 볼륨 확인에 쓴다
+  configuration_values = jsonencode({
+    controller = { extraVolumeTags = data.aws_default_tags.this.tags }
+  })
+
+  pod_identity_association {
+    service_account = "ebs-csi-controller-sa"
+    role_arn        = aws_iam_role.ebs_csi.arn
+  }
+
+  depends_on = [
+    aws_eks_addon.this, # Pod Identity 에이전트가 먼저 있어야 권한을 받는다
+    aws_iam_role_policy_attachment.ebs_csi,
+  ]
+}

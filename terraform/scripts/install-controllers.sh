@@ -2,14 +2,15 @@
 # 메인 apply 후 클러스터에 컨트롤러 2개를 Helm으로 설치한다 (Terraform은 IAM 역할과 Pod Identity 연결까지만 만든다).
 #   - AWS Load Balancer Controller: Ingress를 보고 ALB를 만든다 (kube-system/aws-load-balancer-controller)
 #   - Cluster Autoscaler: Pod가 Pending이면 노드 그룹을 min~max 안에서 늘린다 (kube-system/cluster-autoscaler)
+# 기본 StorageClass gp3(암호화)도 만든다. EBS CSI 드라이버는 Terraform 애드온이고, 쿠폰 Redis PVC가 이 StorageClass로 EBS를 받는다.
 #
 # 사용법 (terraform 폴더에서, Git Bash):
 #   ./scripts/install-controllers.sh           # kubeconfig 설정 -> 두 컨트롤러 설치(또는 같은 버전으로 다시 적용) -> 상태 확인
-#   ./scripts/install-controllers.sh --status  # 설치 없이 상태만 확인
+#   ./scripts/install-controllers.sh --status  # 설치 없이 상태만 확인 (내리기 전 ALB·PVC·EBS가 0인지도 여기서 본다)
 #
 # Helm 설치를 Terraform에 넣지 않은 이유: destroy할 때 컨트롤러가 먼저 지워지면 ALB가 남아 VPC 삭제가 실패한다.
-# 내릴 때는 dns aws_ingress_enabled=false apply -> Ingress 삭제 -> ALB 삭제 확인 -> terraform destroy 순서로 하고,
-# 컨트롤러는 따로 지우지 않는다 (클러스터와 함께 지워진다).
+# 내릴 때는 dns aws_ingress_enabled=false apply -> ArgoCD 앱 삭제(Ingress·PVC) -> ALB·EBS 삭제 확인(--status) -> terraform destroy 순서로 하고,
+# 컨트롤러는 따로 지우지 않는다 (클러스터와 함께 지워진다). ALB와 PVC의 EBS는 컨트롤러·드라이버가 살아 있을 때 지워야 같이 없어진다.
 #
 # 필요한 도구: aws, terraform, kubectl, helm (winget install Kubernetes.kubectl / Helm.Helm)
 set -euo pipefail
@@ -43,6 +44,13 @@ status() {
     --query 'associations[].[namespace, serviceAccount]' --output text | tr -d '\r'
   step "Cluster Autoscaler 최근 로그 (노드 그룹을 찾았는지)"
   kubectl -n kube-system logs deploy/cluster-autoscaler-aws-cluster-autoscaler --tail=20 2>/dev/null | grep -iE "nodegroup|asg|error" || echo "(로그 없음)"
+  step "StorageClass"
+  kubectl get storageclass
+  # destroy는 Terraform 밖에서 생긴 ALB와 EBS를 지우지 않는다. 내리기 전에 셋 다 0이어야 한다
+  step "내리기 전 확인: Terraform 밖 리소스 (destroy 전에 모두 0)"
+  echo "ALB (이 VPC):           $(aws elbv2 describe-load-balancers --region "$REGION" --query "length(LoadBalancers[?VpcId=='$VPC_ID'])" --output text | tr -d '\r')"
+  echo "PVC (전체 네임스페이스): $(kubectl get pvc -A --no-headers 2>/dev/null | wc -l)"
+  echo "EBS CSI 볼륨:           $(aws ec2 describe-volumes --region "$REGION" --filters Name=tag:ebs.csi.aws.com/cluster,Values=true --query 'length(Volumes)' --output text | tr -d '\r')"
 }
 
 step "kubeconfig: $CLUSTER ($REGION)"
@@ -83,6 +91,25 @@ helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler \
   --set rbac.serviceAccount.name=cluster-autoscaler \
   --wait --timeout 5m
 
+# 기본 StorageClass. PVC에 storageClassName이 없으면 이것을 쓴다 (EKS가 만드는 gp2는 기본값이 아니고 암호화도 안 됨).
+# reclaimPolicy Delete: PVC를 지우면 EBS 볼륨도 지워진다. WaitForFirstConsumer: Pod가 뜰 AZ에 볼륨을 만든다 (EBS는 AZ 하나에 묶임)
+step "StorageClass gp3 (기본값, 암호화)"
+kubectl apply -f - <<'YAML'
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  encrypted: "true"
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+YAML
+
 status
 echo
-echo "완료. 다음: 예찬님 APISIX 설치 -> ArgoCD로 Ingress 배포 -> ALB 생성 확인 -> terraform/dns에서 aws_ingress_enabled = true apply"
+echo "완료. 다음: 네임스페이스(ecommerce-main, ingress-apisix, qa) 생성 -> 엔드포인트·CA를 ArgoCD 담당에게 전달 -> 예찬님 APISIX·Redis 설치 -> ArgoCD로 앱·Ingress 배포 -> ALB 생성 확인 -> terraform/dns에서 aws_ingress_enabled = true apply"
