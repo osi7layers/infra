@@ -83,7 +83,7 @@ variable "eks_public_access_cidrs" {
 }
 
 variable "eks_node_instance_types" {
-  description = "EKS 노드 인스턴스 타입 (Free plan 임시: m7i-flex.large). 프리 플랜 계정이라 프리 티어 대상 + 2a/2c 지원 타입만 가능. 유료 플랜 전환 후 필요한 사양으로 변경"
+  description = "EKS 노드 인스턴스 타입. 서브넷 AZ(2a/2c)에서 지원되는 타입이어야 함. Free plan 때 고른 m7i-flex.large를 쓰고, 2026-10-21 유료 플랜 전환 후 사양은 QA 결과를 보고 정한다"
   type        = list(string)
   default     = ["m7i-flex.large"]
 }

@@ -49,7 +49,7 @@ variable "log_retention_days" {
 }
 
 variable "node_instance_types" {
-  description = "노드 인스턴스 타입. 프리 플랜 계정이라 프리 티어 대상만 가능하고, 서브넷 AZ(2a/2c)에서 지원되는 타입이어야 함"
+  description = "노드 인스턴스 타입. 서브넷 AZ(2a/2c)에서 지원되는 타입이어야 함"
   type        = list(string)
   default     = ["m7i-flex.large"]
 }

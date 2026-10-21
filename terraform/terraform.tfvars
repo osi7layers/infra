@@ -30,7 +30,7 @@ eks_public_access_cidrs = [
   "140.238.24.33/32", # OCI private 서브넷 NAT Gateway (ArgoCD가 도는 cp-01, wk-01/02의 출구)
 ]
 # 노드: 앱 Pod가 메모리 512Mi를 요청해 t3.small(2GiB)은 부족 (예찬님 계산: 평소 앱 requests CPU 2.2 / 4.5Gi, 최대 3.7 / 7.5Gi + 시스템)
-# Free plan에서 쓸 수 있는 m7i-flex.large(2 vCPU / 8GiB)로 평소 2대, 최대 3대. 유료 플랜 전환 후 필요한 사양으로 변경
+# m7i-flex.large(2 vCPU / 8GiB) 평소 2대, 최대 3대 (Free plan 때 고른 값. 유료 플랜으로 바꿨으니 QA·KEDA 결과를 보고 사양과 최대 대수를 정한다)
 eks_node_instance_types = ["m7i-flex.large"]
 eks_node_desired_size   = 2
 eks_node_min_size       = 2
