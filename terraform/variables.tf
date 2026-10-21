@@ -100,7 +100,7 @@ variable "eks_node_min_size" {
 
 variable "eks_node_max_size" {
   type    = number
-  default = 3
+  default = 4
 }
 
 variable "eks_access_entries" {

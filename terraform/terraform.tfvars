@@ -30,11 +30,12 @@ eks_public_access_cidrs = [
   "140.238.24.33/32", # OCI private 서브넷 NAT Gateway (ArgoCD가 도는 cp-01, wk-01/02의 출구)
 ]
 # 노드: 앱 Pod가 메모리 512Mi를 요청해 t3.small(2GiB)은 부족 (예찬님 계산: 평소 앱 requests CPU 2.2 / 4.5Gi, 최대 3.7 / 7.5Gi + 시스템)
-# m7i-flex.large(2 vCPU / 8GiB) 평소 2대, 최대 3대 (Free plan 때 고른 값. 유료 플랜으로 바꿨으니 QA·KEDA 결과를 보고 사양과 최대 대수를 정한다)
+# m7i-flex.large(2 vCPU / 8GiB) 평소 2대, 최대 4대. 3대는 시스템 Pod(노드당 약 0.6코어)를 빼면 앱 최대치(앱 3.7 + Redis 0.2 + 쿠폰 워커 최대 1.0)가 안 들어간다.
+# 노드는 Pod가 Pending일 때만 늘어나므로 최대 대수를 올려도 평소 비용은 같다 (사양은 QA·KEDA 결과를 보고 정한다)
 eks_node_instance_types = ["m7i-flex.large"]
 eks_node_desired_size   = 2
 eks_node_min_size       = 2
-eks_node_max_size       = 3
+eks_node_max_size       = 4
 
 # 팀원 kubectl 권한. 사용자는 terraform/iam-users가 만들므로 iam-users를 먼저 apply한다.
 # 클러스터 생성자에게 자동으로 관리자를 주지 않으므로 명호도 여기 넣는다.
