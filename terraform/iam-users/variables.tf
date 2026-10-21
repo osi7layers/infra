@@ -38,3 +38,26 @@ variable "k6_instance_tag" {
   type        = object({ key = string, value = string })
   default     = { key = "Purpose", value = "k6" }
 }
+
+variable "budget_alert_emails" {
+  description = "비용 알림을 받을 이메일 (secret.auto.tfvars에 넣는다, git 제외). 비우면 예산을 만들지 않는다"
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for e in var.budget_alert_emails : can(regex("^[^@ ]+@[^@ ]+[.][^@ ]+$", e))])
+    error_message = "이메일 형식이어야 합니다."
+  }
+}
+
+variable "budget_limit_usd" {
+  description = "월 예산(USD). 이번 달 예상 금액이 이 값을 넘을 것 같으면 알림. 크레딧 약 $123 + 예산 60만 원(약 $430) 기준"
+  type        = number
+  default     = 150
+}
+
+variable "budget_actual_thresholds_usd" {
+  description = "실제 사용 금액(크레딧 차감 전)이 넘으면 알림을 보낼 단계별 금액(USD). 크레딧이 약 $123이라 $120은 크레딧 소진 직전"
+  type        = list(number)
+  default     = [30, 80, 120]
+}

@@ -21,3 +21,8 @@ output "grafana_role_arn" {
   description = "Grafana CloudWatch 데이터 소스의 Assume Role ARN에 넣는 값"
   value       = aws_iam_role.grafana.arn
 }
+
+output "budget_name" {
+  description = "비용 알림 예산 이름 (budget_alert_emails가 비면 null)"
+  value       = try(aws_budgets_budget.monthly[0].name, null)
+}
