@@ -84,7 +84,7 @@ AWS와 OCI는 네트워크로 잇지 않는다 (VPN 없음). EKS의 앱은 NAT G
 - **메인:** `data "aws_eip"`로 Name 태그 `osi7-egress-eip-<번호>`를 찾아 network 모듈의 `nat_eip_allocation_ids`로 넘긴다 (비우면 모듈이 EIP를 직접 만든다. `docs/cli` 비교용 기본 동작). egress의 `nat_eip_count`는 메인 `nat_gateway_count`와 같게 둔다. egress 루트가 없으면 메인 plan이 EIP 조회 실패로 멈추므로, apply 순서는 iam-users -> dns -> egress -> 메인이다.
 - **인터넷을 지나므로** DB 연결은 MySQL TLS를 쓴다 (DB 담당). edge-proxy는 L4 프록시라 TLS를 풀지 않는다.
 - **OCI 쪽(네트워크 담당):** edge-proxy의 TCP 프록시(포트 -> 대상), public 보안 목록에 AWS NAT IP/32 -> 그 포트. DB에는 출발지가 edge-proxy로 보이므로 DB 쪽에 AWS 대역을 열 필요는 없다.
-- **ArgoCD -> EKS:** 반대 방향도 VPN 없이 EKS public endpoint로 간다. `eks_public_access_cidrs`에 OCI private 서브넷 NAT Gateway 공인 IP `140.238.24.33/32`를 넣었다 (cp-01, wk-01/02가 이 IP로 나감). 팀원 PC에서 kubectl을 쓰려면 그 공인 IP/32도 추가한다.
+- **ArgoCD -> EKS:** 반대 방향도 VPN 없이 EKS public endpoint로 간다. `eks_public_access_cidrs`에 OCI private 서브넷 NAT Gateway 공인 IP `140.238.24.33/32`를 넣었다 (cp-01, wk-01/02가 이 IP로 나감). 팀원 PC에서 kubectl을 쓰려면 그 공인 IP/32도 추가한다. 학원 IP처럼 git에 남기지 않을 값은 `terraform/local.auto.tfvars`(gitignore, 자동으로 읽힘)에 OCI NAT IP와 함께 목록 전체를 적는다 (목록 변수는 합쳐지지 않고 덮어쓰며, `*.auto.tfvars`는 이름 순서로 읽혀 뒤 파일이 이긴다. 그래서 `secret.auto.tfvars`에는 이 변수를 넣지 않는다).
 - Site-to-Site VPN(`terraform/vpn/`)은 이 방식으로 바꾸면서 2026-10-19에 destroy하고 폴더를 지웠다.
 
 ### ECR (`terraform/ecr/`)
