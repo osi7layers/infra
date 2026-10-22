@@ -30,9 +30,10 @@ eks_public_access_cidrs = [
   "140.238.24.33/32", # OCI private 서브넷 NAT Gateway (ArgoCD가 도는 cp-01, wk-01/02의 출구)
 ]
 # 노드: 앱 Pod가 메모리 512Mi를 요청해 t3.small(2GiB)은 부족 (예찬님 계산: 평소 앱 requests CPU 2.2 / 4.5Gi, 최대 3.7 / 7.5Gi + 시스템)
-# m7i-flex.large(2 vCPU / 8GiB) 평소 2대, 최대 4대. 3대는 시스템 Pod(노드당 약 0.6코어)를 빼면 앱용 약 4.0코어인데, 앱 최대치(앱 3.7 + redis-cache 0.1 = 3.8)가 95%라 Pod 배치 여유가 없다 (APISIX 등이 더해지면 넘침).
+# m7i.large(2 vCPU / 8GiB) 평소 2대, 최대 4대. 3대는 시스템 Pod(노드당 약 0.6코어)를 빼면 앱용 약 4.0코어인데, 앱 최대치(앱 3.7 + redis-cache 0.1 = 3.8)가 95%라 Pod 배치 여유가 없다 (APISIX 등이 더해지면 넘침).
 # 노드는 Pod가 Pending일 때만 늘어나므로 최대 대수를 올려도 평소 비용은 같다 (사양은 QA·KEDA 결과를 보고 정한다)
-eks_node_instance_types = ["m7i-flex.large"]
+# Free plan 때는 m7i-flex.large였다. flex는 기본 성능 40%에 '95% 시간 동안' 100%까지라 부하 테스트 중 느려질 수 있어서, 유료 플랜 전환 후 항상 100%인 m7i.large로 바꿈 (2026-10-22, 노드당 시간당 $0.1177 -> $0.1239)
+eks_node_instance_types = ["m7i.large"]
 eks_node_desired_size   = 2
 eks_node_min_size       = 2
 eks_node_max_size       = 4
