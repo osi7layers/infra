@@ -5,5 +5,7 @@ crash.log
 *.tfplan
 # 비밀 값이 들어가는 변수 파일은 올리지 않는다
 secret.auto.tfvars
+# PC마다 다른 값 (예: kubectl을 쓰는 팀원 공인 IP를 넣은 eks_public_access_cidrs). git에 남기지 않는다
+local.auto.tfvars
 tfplan
 tfplan.json
