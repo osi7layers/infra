@@ -112,4 +112,4 @@ YAML
 
 status
 echo
-echo "완료. 다음: 네임스페이스(ecommerce-main, ingress-apisix, qa) 생성 -> ArgoCD 담당(지은님)에게 apply 완료 알림(osi7-argocd로 엔드포인트·CA를 직접 조회해 클러스터 시크릿 갱신) -> 예찬님 APISIX·Redis 설치 -> ArgoCD로 앱·Ingress 배포 -> ALB 생성 확인 -> terraform/dns에서 aws_ingress_enabled = true apply"
+echo "완료. 다음: 네임스페이스(ecommerce-main, ingress-apisix) 생성 -> ArgoCD 담당(지은님)에게 apply 완료 알림(osi7-argocd로 엔드포인트·CA를 직접 조회해 클러스터 시크릿 갱신) -> 예찬님 APISIX·Redis 설치 -> ArgoCD로 앱·Ingress 배포 -> ALB 생성 확인 -> terraform/dns에서 aws_ingress_enabled = true apply"
