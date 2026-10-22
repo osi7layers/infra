@@ -2,7 +2,7 @@
 # 메인 apply 후 클러스터에 컨트롤러 2개를 Helm으로 설치한다 (Terraform은 IAM 역할과 Pod Identity 연결까지만 만든다).
 #   - AWS Load Balancer Controller: Ingress를 보고 ALB를 만든다 (kube-system/aws-load-balancer-controller)
 #   - Cluster Autoscaler: Pod가 Pending이면 노드 그룹을 min~max 안에서 늘린다 (kube-system/cluster-autoscaler)
-# 기본 StorageClass gp3(암호화)도 만든다. EBS CSI 드라이버는 Terraform 애드온이고, 쿠폰 Redis PVC가 이 StorageClass로 EBS를 받는다.
+# 기본 StorageClass gp3(암호화)도 만든다. EBS CSI 드라이버는 Terraform 애드온이고, PVC가 이 StorageClass로 EBS를 받는다 (2026-10-22 기준 AWS에서 PVC를 쓰는 앱은 없음).
 #
 # 사용법 (terraform 폴더에서, Git Bash):
 #   ./scripts/install-controllers.sh           # kubeconfig 설정 -> 두 컨트롤러 설치(또는 같은 버전으로 다시 적용) -> 상태 확인

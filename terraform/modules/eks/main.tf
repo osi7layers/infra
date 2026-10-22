@@ -351,7 +351,8 @@ resource "aws_eks_addon" "cloudwatch_observability" {
 }
 
 # ---------------------------------------------------------------- EBS CSI 드라이버 (PVC -> EBS 볼륨)
-# 앱의 쿠폰 Redis(redis-coupon)가 PVC로 디스크를 쓴다. 드라이버가 PVC마다 EBS 볼륨을 만들고 지운다.
+# PVC마다 드라이버가 EBS 볼륨을 만들고 지운다. 쿠폰 Redis용으로 추가했지만 쿠폰은 온프레미스에서만 처리하기로 해서(2026-10-22)
+# 지금 AWS에서 PVC를 쓰는 앱은 없다. 비용이 없어서 이후 PVC가 필요할 때를 위해 남겨 둔다.
 # StorageClass(gp3, 암호화, 기본값)는 쿠버네티스 리소스라 scripts/install-controllers.sh가 만든다 (이 루트에는 쿠버네티스 provider가 없음).
 # 드라이버가 만든 볼륨은 Terraform state에 없어서 destroy가 지우지 않는다. 내리기 전에 PVC를 지워 볼륨을 먼저 없앤다 (CLAUDE.md 내리는 순서).
 resource "aws_iam_role" "ebs_csi" {
