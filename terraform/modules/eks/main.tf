@@ -181,7 +181,7 @@ resource "aws_eks_access_policy_association" "this" {
   }
 }
 
-# 기본 정책에 더해 특정 네임스페이스에만 주는 정책 (예: 클러스터 전체 View + qa 네임스페이스 Edit)
+# 기본 정책에 더해 특정 네임스페이스에만 주는 정책 (예: 클러스터 전체 View + 특정 네임스페이스 Edit)
 locals {
   extra_access_policies = merge([
     for user, e in var.access_entries : {

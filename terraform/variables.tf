@@ -116,7 +116,7 @@ variable "eks_access_entries" {
     jieun       = { policy = "AmazonEKSAdminPolicy", namespaces = ["ecommerce-main"] }
     hongseop    = { policy = "AmazonEKSAdminPolicy", namespaces = ["monitoring"] }
     kwangryeol  = { policy = "AmazonEKSViewPolicy" }
-    jaehak      = { policy = "AmazonEKSViewPolicy", extra_policies = { AmazonEKSEditPolicy = ["qa"] } }
+    jaehak      = { policy = "AmazonEKSViewPolicy" }
     junho       = { policy = "AmazonEKSViewPolicy", namespaces = ["ecommerce-main"] }
     osi7-argocd = { policy = "AmazonEKSAdminPolicy", namespaces = ["ecommerce-main", "ingress-apisix"] }
   }
