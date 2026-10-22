@@ -50,9 +50,9 @@ QA A-IAC-01의 "CLI 단계 기록 문서". 단계를 진행할 때마다 채운�
 
 | 항목 | 값 |
 |---|---|
-| 날짜 | |
-| `terraform plan -detailed-exitcode` 종료 코드 | (0이어야 함) |
-| `diff snapshot-cli.txt snapshot-terraform.txt` | (예상 차이 외 0건이어야 함) |
+| 날짜 | 2026-10-22 |
+| `terraform plan -detailed-exitcode` 종료 코드 | 0 (No changes) |
+| `diff snapshot-cli.txt snapshot-terraform.txt` | 차이 4종, 모두 예상된 차이 (아래 표) |
 
 ### 차이 목록
 
@@ -61,5 +61,8 @@ QA A-IAC-01의 "CLI 단계 기록 문서". 단계를 진행할 때마다 채운�
 | ECR 리포지토리 수 | 1 | 5 | 예 (CLI는 1개만 만듦) |
 | ECR 리포지토리 이름 | osi-shop/frontend | ecommerce/web | 예 (2026-10-15 이름 변경. CLI를 다시 돌리면 같아짐) |
 | ECR 수명 주기 설명 문구 | 영어 | 한글 | 예 (보관 개수 10은 같아야 함) |
-| EKS 클러스터 SG | 없음 | 있음 | 예 (EKS가 만듦) |
-| | | | |
+| EKS 클러스터 SG | 없음 | 있음 (`eks-cluster-sg-osi7-eks-*`, 규칙 3개) | 예 (EKS가 만듦) |
+| ALB SG → 노드 SG 포트 | 30000-32767 (NodePort) | 9080(APISIX), 7085(상태 검사) | 예 (CLI 단계 뒤 2026-10-19·21에 진입을 ALB → APISIX Pod 직접(target-type ip)으로 바꿈. `02-security.sh`는 이미 9080·7085로 고쳐 두어 다시 돌리면 같아짐) |
+
+- 수명 주기 설명 문구는 이번 비교에서 차이로 나오지 않았다. VPC, 서브넷, 라우트, NAT, IGW, 노드 역할의 정책 이름은 같다.
+- 결론: CLI로 만든 구성과 Terraform 구성은 이후 설계 변경(진입 포트)과 EKS가 만드는 리소스를 빼면 같다 (QA A-IAC-01).
