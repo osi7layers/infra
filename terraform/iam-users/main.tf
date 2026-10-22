@@ -7,7 +7,7 @@ data "aws_caller_identity" "current" {}
 locals {
   account_id = data.aws_caller_identity.current.account_id
 
-  groups = ["infra-admin", "network", "k8s-operator", "cicd", "observability", "readonly", "qa-k6"]
+  groups = ["infra-admin", "network", "k8s-operator", "cicd", "observability", "readonly", "qa-k6", "storage"]
 
   # AWS 관리형 정책 (그룹 -> 정책 ARN)
   managed_policies = {
@@ -28,13 +28,15 @@ locals {
     "cicd/ecr-push"          = { group = "cicd", policy = "ecr-push" }
     "observability/eks-read" = { group = "observability", policy = "eks-read" }
     "qa-k6/ec2-start-stop"   = { group = "qa-k6", policy = "k6-ec2" }
+    "storage/product-images" = { group = "storage", policy = "product-images" }
   }
 
   policy_documents = {
-    "eks-read" = data.aws_iam_policy_document.eks_read.json
-    "ecr-push" = data.aws_iam_policy_document.ecr_push.json
-    "k6-ec2"   = data.aws_iam_policy_document.k6_ec2.json
-    "self-mfa" = data.aws_iam_policy_document.self_mfa.json
+    "eks-read"       = data.aws_iam_policy_document.eks_read.json
+    "ecr-push"       = data.aws_iam_policy_document.ecr_push.json
+    "k6-ec2"         = data.aws_iam_policy_document.k6_ec2.json
+    "product-images" = data.aws_iam_policy_document.product_images.json
+    "self-mfa"       = data.aws_iam_policy_document.self_mfa.json
 
     "grafana-assume" = data.aws_iam_policy_document.grafana_assume.json
   }
@@ -245,6 +247,34 @@ data "aws_iam_policy_document" "k6_ec2" {
       variable = "aws:ResourceTag/${var.k6_instance_tag.key}"
       values   = [var.k6_instance_tag.value]
     }
+  }
+}
+
+# 준호: 상품 이미지용 버킷을 직접 만들고 테스트한다 (2026-10-22 요청). 이름이 <project>-product-로 시작하는 버킷만 다룬다.
+# 같은 계정의 Terraform state 버킷(osi7-tfstate-*)은 이름이 달라 건드릴 수 없다.
+# 버킷 정책·공개 차단·소유권(ACL) 설정과 버킷 삭제는 주지 않는다. 새 버킷은 AWS 기본값(공개 차단, SSE-S3 암호화, ACL 비활성)으로 만들어지고 공개로 바꿀 수 없다.
+# 앱이 실제로 쓸 때는 개인 키 대신 앱 전용 권한(OCI: 서비스 계정 키, AWS: Pod Identity)을 따로 만든다.
+data "aws_iam_policy_document" "product_images" {
+  statement {
+    sid = "Buckets"
+    actions = [
+      "s3:CreateBucket",
+      "s3:ListBucket",
+      "s3:GetBucketLocation",
+      "s3:GetBucketTagging",
+      "s3:PutBucketTagging",
+      "s3:GetLifecycleConfiguration",
+      "s3:PutLifecycleConfiguration",
+      "s3:GetBucketCORS",
+      "s3:PutBucketCORS", # 브라우저가 Presigned URL로 직접 올리거나 받을 때 필요
+    ]
+    resources = ["arn:aws:s3:::${var.project}-product-*"]
+  }
+
+  statement {
+    sid       = "Objects"
+    actions   = ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"]
+    resources = ["arn:aws:s3:::${var.project}-product-*/*"]
   }
 }
 

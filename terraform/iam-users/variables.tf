@@ -17,19 +17,19 @@ variable "ecr_namespace" {
 }
 
 # 키는 IAM 사용자 이름. 메인의 eks_access_entries도 같은 이름을 쓴다.
-# 그룹: infra-admin, network, k8s-operator, cicd, observability, readonly, qa-k6
+# 그룹: infra-admin, network, k8s-operator, cicd, observability, readonly, qa-k6, storage
 # 루트 계정은 프로젝트에 쓰지 않는다. Terraform은 myungho(infra-admin)의 aws login 세션(credential_process)으로 실행한다.
 variable "users" {
   description = "팀원 IAM 사용자 이름 -> 소속 그룹 목록"
   type        = map(list(string))
   default = {
-    myungho    = ["infra-admin"]       # 명호: IaC (Terraform 실행)
-    kwangryeol = ["network"]           # 광렬: 네트워크(VPN, Route 53)
-    yechan     = ["k8s-operator"]      # 예찬: 워크로드/스케일링
-    jieun      = ["cicd"]              # 지은: CI/CD
-    hongseop   = ["observability"]     # 홍섭: 관측성
-    jaehak     = ["readonly", "qa-k6"] # 재학: QA (k6 EC2 시작/중지)
-    junho      = ["readonly"]          # 준호: DB
+    myungho    = ["infra-admin"]         # 명호: IaC (Terraform 실행)
+    kwangryeol = ["network"]             # 광렬: 네트워크(VPN, Route 53)
+    yechan     = ["k8s-operator"]        # 예찬: 워크로드/스케일링
+    jieun      = ["cicd"]                # 지은: CI/CD
+    hongseop   = ["observability"]       # 홍섭: 관측성
+    jaehak     = ["readonly", "qa-k6"]   # 재학: QA (k6 EC2 시작/중지)
+    junho      = ["readonly", "storage"] # 준호: DB, 상품 이미지 버킷(osi7-product-*) 생성·테스트
   }
 }
 
