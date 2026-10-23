@@ -22,17 +22,19 @@ locals {
 
   # 직접 만든 정책 (그룹 -> 정책 이름). readonly는 ReadOnlyAccess에 EKS 조회가 들어 있어 eks-read가 필요 없다
   custom_policies = {
-    "network/eks-read"       = { group = "network", policy = "eks-read" }
-    "k8s-operator/eks-read"  = { group = "k8s-operator", policy = "eks-read" }
-    "cicd/eks-read"          = { group = "cicd", policy = "eks-read" }
-    "cicd/ecr-push"          = { group = "cicd", policy = "ecr-push" }
-    "observability/eks-read" = { group = "observability", policy = "eks-read" }
-    "qa-k6/ec2-start-stop"   = { group = "qa-k6", policy = "k6-ec2" }
-    "storage/product-images" = { group = "storage", policy = "product-images" }
+    "network/eks-read"        = { group = "network", policy = "eks-read" }
+    "k8s-operator/eks-read"   = { group = "k8s-operator", policy = "eks-read" }
+    "cicd/eks-read"           = { group = "cicd", policy = "eks-read" }
+    "cicd/ecr-push"           = { group = "cicd", policy = "ecr-push" }
+    "observability/eks-read"  = { group = "observability", policy = "eks-read" }
+    "observability/cost-read" = { group = "observability", policy = "cost-read" }
+    "qa-k6/ec2-start-stop"    = { group = "qa-k6", policy = "k6-ec2" }
+    "storage/product-images"  = { group = "storage", policy = "product-images" }
   }
 
   policy_documents = {
     "eks-read"       = data.aws_iam_policy_document.eks_read.json
+    "cost-read"      = data.aws_iam_policy_document.cost_read.json
     "ecr-push"       = data.aws_iam_policy_document.ecr_push.json
     "k6-ec2"         = data.aws_iam_policy_document.k6_ec2.json
     "product-images" = data.aws_iam_policy_document.product_images.json
@@ -275,6 +277,32 @@ data "aws_iam_policy_document" "product_images" {
     sid       = "Objects"
     actions   = ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"]
     resources = ["arn:aws:s3:::${var.project}-product-*/*"]
+  }
+}
+
+# 관측 담당이 콘솔에서 비용을 보는 권한 (Cost Explorer, 예산, 크레딧, 청구서 조회만).
+# 결제 수단(payments), 세금, 계정 설정과 모든 변경 작업은 넣지 않는다.
+# Cost Explorer API는 호출마다 $0.01이라 Grafana 역할(osi7-grafana-read)에는 주지 않는다. Grafana 비용 패널은
+# CloudWatch Billing 지표(AWS/Billing, us-east-1)로 만들고, 그 조회는 기존 GetMetricData 권한으로 된다.
+data "aws_iam_policy_document" "cost_read" {
+  #checkov:skip=CKV_AWS_356:Cost Explorer·청구 조회는 계정 전체 비용을 읽는 작업이라 리소스를 좁힐 수 없음 (조회만, 변경 작업 없음). 예산은 예산 ARN으로 좁힘
+  statement {
+    sid = "CostRead"
+    actions = [
+      "ce:Get*",
+      "ce:Describe*",
+      "ce:List*",
+      "freetier:Get*",
+      "billing:Get*",
+      "billing:List*",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    sid       = "BudgetsRead"
+    actions   = ["budgets:ViewBudget", "budgets:Describe*"]
+    resources = ["arn:aws:budgets::${local.account_id}:budget/*"]
   }
 }
 
