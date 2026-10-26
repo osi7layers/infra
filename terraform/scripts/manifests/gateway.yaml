@@ -1,0 +1,49 @@
+# APISIX Gateway API 리소스 (EKS용). install-controllers.sh가 APISIX 설치 후 kubectl apply한다.
+# 온프렘 osi7-oci/platform/gateway.yaml(광렬님, 2026-10-26 받음)과 같고, 리스너만 다르다 ("EKS:" 주석).
+# GatewayClass는 클러스터 단위라 ArgoCD(네임스페이스 권한)가 만들 수 없어서 온프렘처럼 kubectl로 관리한다.
+# admin key는 Secret ingress-apisix/apisix-admin-key(admin, viewer)에서 읽는다. EKS에서는 스크립트가 새 임의 값으로 만든다.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata: { name: apisix }
+spec:
+  controllerName: apisix.apache.org/apisix-ingress-controller
+---
+apiVersion: apisix.apache.org/v1alpha1
+kind: GatewayProxy
+metadata: { name: osi7-gateway-proxy, namespace: ingress-apisix } # 차트 기본 apisix-config와 겹치지 않게
+spec:
+  provider:
+    type: ControlPlane
+    controlPlane:
+      service: { name: apisix-admin, port: 9180 }
+      auth:
+        type: AdminKey
+        adminKey: { valueFrom: { secretKeyRef: { name: apisix-admin-key, key: admin } } }
+  plugins:
+    - name: cors
+      enabled: true
+      config:
+        allow_origins: "https://shop.osi7.shop"
+        allow_methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS"
+        allow_headers: "Authorization,Content-Type,X-Requested-With"
+        max_age: 3600
+    - name: prometheus
+      enabled: true
+      config: {}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata: { name: ecommerce-gateway, namespace: ingress-apisix }
+spec:
+  gatewayClassName: apisix
+  infrastructure:
+    parametersRef: { group: apisix.apache.org, kind: GatewayProxy, name: osi7-gateway-proxy }
+  # EKS: TLS는 ALB(ACM 인증서)에서 끝나고 APISIX에는 HTTP(9080)로만 들어오므로 http 리스너 하나만 둔다.
+  # 온프렘의 https(osi7-tls), https-dev(osi7-dev-tls)는 cert-manager 인증서 Secret이 EKS에 없고, dev 환경은 AWS에 없다.
+  # HTTPRoute가 parentRefs에 sectionName(https 등)을 적으면 이 Gateway에 붙지 않으므로 sectionName 없이 쓰거나 http로 적는다.
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces: { from: Selector, selector: { matchLabels: { osi7/gateway: "true" } } } # ecommerce-main에 이 라벨을 붙인다 (스크립트)

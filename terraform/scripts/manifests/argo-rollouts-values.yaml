@@ -1,0 +1,9 @@
+# Argo Rollouts 차트 2.43.6 values (EKS용). 온프렘과 같은 값이다 (예찬님, 2026-10-23 받음).
+# Rollouts가 HTTPRoute 가중치를 바꿔 카나리 비율을 조절한다 (Gateway API 트래픽 플러그인). HTTPRoute 수정 권한은 차트 기본값에 들어 있다.
+# 플러그인은 컨트롤러가 시작할 때 GitHub에서 받으므로 노드가 NAT로 인터넷에 나갈 수 있어야 한다.
+controller:
+  image:
+    tag: v1.10.1
+  trafficRouterPlugins:
+    - name: argoproj-labs/gatewayAPI
+      location: https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.17.0/gatewayapi-plugin-linux-amd64
