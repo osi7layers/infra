@@ -98,6 +98,10 @@ helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-contro
   --set serviceAccount.name=aws-load-balancer-controller \
   --set defaultTags.Project=osi7 \
   --wait --timeout 5m
+# 다시 실행하면 차트가 웹훅 인증서를 새로 만들지만 떠 있는 Pod는 예전 인증서를 계속 써서, 모든 Service 생성이
+# "x509: certificate signed by unknown authority"로 실패한다 (2026-10-26 발생). 재시작해 새 인증서를 읽게 한다
+kubectl -n kube-system rollout restart deploy/aws-load-balancer-controller
+kubectl -n kube-system rollout status deploy/aws-load-balancer-controller --timeout=3m
 
 step "Cluster Autoscaler $CA_CHART_VERSION (이미지 $CA_IMAGE_TAG)"
 helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler \
@@ -159,15 +163,20 @@ fi
 
 # realIpFrom: ALB가 붙인 X-Forwarded-For는 VPC 안에서 온 것만 믿는다
 VPC_CIDR=$(aws ec2 describe-vpcs --vpc-ids "$VPC_ID" --region "$REGION" --query 'Vpcs[0].CidrBlock' --output text | tr -d '\r')
+# standalone 모드의 APISIX는 Ingress Controller가 설정을 넣어 줘야 ready(/status/ready 200)가 되고,
+# Ingress Controller는 Gateway·GatewayProxy가 있어야 설정을 넣는다. 그래서 --wait 없이 설치하고 Gateway를 만든 뒤에 ready를 기다린다
+# (--wait를 걸면 서로를 기다리다 시간 초과로 실패한다. 2026-10-26 발생)
 step "APISIX $APISIX_CHART_VERSION (real IP 신뢰 대역 $VPC_CIDR)"
 helm upgrade --install apisix apisix/apisix \
   --namespace ingress-apisix --version "$APISIX_CHART_VERSION" --skip-crds \
   -f "$MANIFESTS/apisix-values.yaml" \
-  --set-json "apisix.nginx.http.realIpFrom=[\"$VPC_CIDR\"]" \
-  --wait --timeout 5m
+  --set-json "apisix.nginx.http.realIpFrom=[\"$VPC_CIDR\"]"
+kubectl -n ingress-apisix rollout status deploy/apisix-ingress-controller --timeout=5m
 
 step "GatewayClass·GatewayProxy·Gateway (manifests/gateway.yaml)"
 kubectl apply -f "$MANIFESTS/gateway.yaml"
+kubectl -n ingress-apisix rollout status ds/apisix --timeout=5m
+kubectl -n ingress-apisix wait --for=condition=Programmed gateway/ecommerce-gateway --timeout=2m
 
 step "KEDA $KEDA_CHART_VERSION"
 helm upgrade --install keda kedacore/keda \
