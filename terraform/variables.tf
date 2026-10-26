@@ -121,3 +121,9 @@ variable "eks_access_entries" {
     osi7-argocd = { policy = "AmazonEKSAdminPolicy", namespaces = ["ecommerce-main", "ingress-apisix"] }
   }
 }
+
+variable "eks_app_metrics_enabled" {
+  description = "앱 지표(/actuator/prometheus -> CloudWatch osi7/App) 수집. 앱이 뜬 뒤에 켠다"
+  type        = bool
+  default     = false
+}

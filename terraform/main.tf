@@ -81,4 +81,5 @@ module "eks" {
   node_min_size       = var.eks_node_min_size
   node_max_size       = var.eks_node_max_size
   access_entries      = var.eks_access_entries
+  app_metrics_enabled = var.eks_app_metrics_enabled
 }

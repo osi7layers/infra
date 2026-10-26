@@ -1,5 +1,6 @@
 # ---------------------------------------------------------------- Secrets 암호화 키
 data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
 
 data "aws_iam_policy_document" "secrets_key" {
   #checkov:skip=CKV_AWS_109:KMS 키 정책의 표준 형태(계정 루트 위임). 실제 접근은 IAM 정책으로 제한
@@ -315,7 +316,8 @@ resource "aws_eks_pod_identity_association" "cluster_autoscaler" {
 resource "aws_cloudwatch_log_group" "container_insights" {
   #checkov:skip=CKV_AWS_338:학습 프로젝트라 비용을 위해 30일만 보관
   #checkov:skip=CKV_AWS_158:로그 그룹 KMS 암호화는 비용 대비 효과가 낮아 생략
-  for_each = toset(["application", "dataplane", "host", "performance"])
+  # prometheus: 앱 지표(app_metrics_enabled)가 EMF 로그로 이 그룹을 거쳐 CloudWatch 지표가 된다
+  for_each = toset(["application", "dataplane", "host", "performance", "prometheus"])
 
   name              = "/aws/containerinsights/${var.cluster_name}/${each.key}"
   retention_in_days = var.log_retention_days
@@ -340,9 +342,11 @@ resource "aws_eks_addon" "cloudwatch_observability" {
   # 애드온 기본값(monitorAllServices = true)은 모든 Pod에 OpenTelemetry 에이전트(Application Signals)를 넣는다 (2026-10-26 v6.7.0에서 확인).
   # 앱(Java)에 JAVA_TOOL_OPTIONS로 에이전트가 붙어 온프렘과 성능 비교가 달라지고 트레이스 요금이 생기므로 끈다.
   # 앱 지표는 Container Insights와 Prometheus 수집으로 본다. 이미 뜬 Pod는 재시작해야 에이전트가 빠진다
-  configuration_values = jsonencode({
-    manager = { applicationSignals = { autoMonitor = { monitorAllServices = false } } }
-  })
+  configuration_values = jsonencode(merge(
+    { manager = { applicationSignals = { autoMonitor = { monitorAllServices = false } } } },
+    # 조건식의 두 결과 타입이 달라 for 식으로 켜고 끈다
+    { for k, v in { agent = local.app_metrics_agent } : k => v if var.app_metrics_enabled }
+  ))
 
   # 에이전트와 Fluent Bit가 같은 서비스 계정을 쓴다
   pod_identity_association {
@@ -355,6 +359,92 @@ resource "aws_eks_addon" "cloudwatch_observability" {
     aws_cloudwatch_log_group.container_insights,
     aws_iam_role_policy_attachment.cloudwatch_agent,
   ]
+}
+
+# ---------------------------------------------------------------- 앱 지표 (Spring /actuator/prometheus -> CloudWatch)
+# 에이전트가 앱 Pod의 Prometheus 엔드포인트를 긁어 EMF로 CloudWatch 지표(네임스페이스 osi7/App)를 만든다. 온프렘 Grafana가 조회한다 (홍섭님 요청).
+# agent.config를 넣으면 애드온 기본 설정을 통째로 바꾸므로, 기본 설정(2026-10-26 v6.7.0 클러스터에서 읽음)에 prometheus만 더한다.
+# 에이전트는 노드마다 뜨는 DaemonSet이라 그대로면 노드 수만큼 같은 Pod를 중복 수집한다. target allocator가 대상을 에이전트별로 나눈다.
+# 사용자 지정 지표는 이름·디멘션 조합마다 월 $0.30(보내는 시간만큼)이라 디멘션에 Pod 이름·URI를 넣지 않는다.
+locals {
+  app_metrics_agent = {
+    config = {
+      agent = { region = data.aws_region.current.name }
+      logs = {
+        metrics_collected = {
+          application_signals = { hosted_in = var.cluster_name }
+          kubernetes          = { cluster_name = var.cluster_name, enhanced_container_insights = true }
+          prometheus = {
+            cluster_name           = var.cluster_name
+            log_group_name         = "/aws/containerinsights/${var.cluster_name}/prometheus"
+            prometheus_config_path = "/etc/prometheusconfig/prometheus.yaml" # 오퍼레이터가 prometheus.config를 마운트하는 경로
+            emf_processor = {
+              metric_declaration_dedup = true
+              metric_namespace         = "osi7/App"
+              metric_unit = {
+                http_server_requests_seconds_count         = "Count"
+                http_server_requests_seconds_sum           = "Seconds"
+                hikaricp_connections_active                = "Count"
+                hikaricp_connections_idle                  = "Count"
+                hikaricp_connections_pending               = "Count"
+                hikaricp_connections_max                   = "Count"
+                hikaricp_connections_timeout_total         = "Count"
+                hikaricp_connections_acquire_seconds_count = "Count"
+                hikaricp_connections_acquire_seconds_sum   = "Seconds"
+              }
+              metric_declaration = [
+                {
+                  source_labels    = ["job"]
+                  label_matcher    = "^ecommerce-app$"
+                  dimensions       = [["ClusterName", "Namespace", "Service", "StatusClass"]]
+                  metric_selectors = ["^http_server_requests_seconds_(count|sum)$"]
+                },
+                {
+                  source_labels    = ["job"]
+                  label_matcher    = "^ecommerce-app$"
+                  dimensions       = [["ClusterName", "Namespace", "Service"]]
+                  metric_selectors = ["^hikaricp_connections_(active|idle|pending|max|timeout_total)$", "^hikaricp_connections_acquire_seconds_(count|sum)$"]
+                },
+              ]
+            }
+          }
+        }
+      }
+      traces = { traces_collected = { application_signals = {} } }
+    }
+    prometheus = {
+      targetAllocator = { enabled = true }
+      config = {
+        global = { scrape_interval = "60s", scrape_timeout = "10s" }
+        scrape_configs = [{
+          job_name              = "ecommerce-app"
+          metrics_path          = "/actuator/prometheus"
+          kubernetes_sd_configs = [{ role = "pod", namespaces = { names = var.app_metrics_namespaces } }]
+          relabel_configs = [
+            # 앱 관리 포트(app_metrics_port)가 있는 컨테이너만 긁는다
+            { source_labels = ["__meta_kubernetes_pod_container_port_number"], regex = tostring(var.app_metrics_port), action = "keep" },
+            { source_labels = ["__meta_kubernetes_pod_phase"], regex = "Running", action = "keep" },
+            { target_label = "ClusterName", replacement = var.cluster_name },
+            { source_labels = ["__meta_kubernetes_namespace"], target_label = "Namespace" },
+            # 서비스 이름: app 라벨, 있으면 app.kubernetes.io/name 라벨 (값이 있을 때만 덮어씀)
+            { source_labels = ["__meta_kubernetes_pod_label_app"], regex = "(.+)", target_label = "Service" },
+            { source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"], regex = "(.+)", target_label = "Service" },
+            # 버전·역할은 아직 디멘션에 넣지 않고 라벨로만 남긴다 (예찬님 라벨 확인 후 디멘션 추가)
+            { source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_version"], regex = "(.+)", target_label = "Version" },
+            { source_labels = ["__meta_kubernetes_pod_label_role"], regex = "(.+)", target_label = "Role" },
+          ]
+          metric_relabel_configs = [
+            # 필요한 지표만 남겨 EMF 로그 양을 줄인다
+            { source_labels = ["__name__"], regex = "http_server_requests_seconds_(count|sum)|hikaricp_connections_.*", action = "keep" },
+            # 수집 요청(/actuator/prometheus) 자체가 요청 수에 섞이지 않게 뺀다
+            { source_labels = ["uri"], regex = "/actuator.*", action = "drop" },
+            # 상태 코드 200·404 등을 2xx·4xx로 묶는다
+            { source_labels = ["status"], regex = "([1-5])..", target_label = "StatusClass", replacement = "$${1}xx" },
+          ]
+        }]
+      }
+    }
+  }
 }
 
 # ---------------------------------------------------------------- EBS CSI 드라이버 (PVC -> EBS 볼륨)

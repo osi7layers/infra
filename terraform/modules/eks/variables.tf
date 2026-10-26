@@ -83,3 +83,21 @@ variable "access_entries" {
   }))
   default = {}
 }
+
+variable "app_metrics_enabled" {
+  description = "앱 Pod의 Prometheus 엔드포인트(/actuator/prometheus)를 CloudWatch 에이전트로 수집해 osi7/App 지표로 보낼지. 앱이 뜬 뒤에 켠다"
+  type        = bool
+  default     = false
+}
+
+variable "app_metrics_namespaces" {
+  description = "앱 지표를 수집할 네임스페이스"
+  type        = list(string)
+  default     = ["ecommerce-main"]
+}
+
+variable "app_metrics_port" {
+  description = "앱의 Prometheus 엔드포인트 포트 (Spring 관리 포트, 온프렘과 같은 9000)"
+  type        = number
+  default     = 9000
+}
