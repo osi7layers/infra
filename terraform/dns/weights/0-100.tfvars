@@ -4,5 +4,3 @@
 aws_ingress_enabled = true
 onprem_weight       = 0
 aws_weight          = 100
-# switch_hosts(keycloak)는 가중치 없이 0:100에서만 AWS로 넘긴다
-switch_target = "aws"
