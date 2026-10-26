@@ -337,6 +337,13 @@ resource "aws_eks_addon" "cloudwatch_observability" {
   resolve_conflicts_on_create = "OVERWRITE"
   resolve_conflicts_on_update = "OVERWRITE"
 
+  # 애드온 기본값(monitorAllServices = true)은 모든 Pod에 OpenTelemetry 에이전트(Application Signals)를 넣는다 (2026-10-26 v6.7.0에서 확인).
+  # 앱(Java)에 JAVA_TOOL_OPTIONS로 에이전트가 붙어 온프렘과 성능 비교가 달라지고 트레이스 요금이 생기므로 끈다.
+  # 앱 지표는 Container Insights와 Prometheus 수집으로 본다. 이미 뜬 Pod는 재시작해야 에이전트가 빠진다
+  configuration_values = jsonencode({
+    manager = { applicationSignals = { autoMonitor = { monitorAllServices = false } } }
+  })
+
   # 에이전트와 Fluent Bit가 같은 서비스 계정을 쓴다
   pod_identity_association {
     service_account = "cloudwatch-agent"
