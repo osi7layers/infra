@@ -1,0 +1,35 @@
+# 온프렘 ArgoCD(osi7-argocd)가 앱과 함께 배포하는 CRD 리소스 권한 (EKS용). install-controllers.sh가 kubectl apply한다.
+# osi7-argocd의 EKS 액세스 정책 AmazonEKSAdminPolicy는 기본 리소스(Deployment, Service, Secret, Ingress 등)만 허용하고
+# CRD 리소스는 포함하지 않는다 (액세스 정책은 수정할 수 없음). 그래서 Kubernetes RBAC로 같은 두 네임스페이스에만 더한다.
+#   gateway.networking.k8s.io: HTTPRoute / argoproj.io: Rollout, AnalysisTemplate (product 카나리)
+#   keda.sh: ScaledObject, TriggerAuthentication / apisix.apache.org: PluginConfig(OIDC) 등
+# RoleBinding의 사용자 이름은 Access Entry 기본값인 IAM 사용자 ARN이다. 스크립트가 __ARGOCD_USER__를 계정 ID로 채운다.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: { name: argocd-crd-resources, namespace: ecommerce-main }
+rules:
+  - apiGroups: [gateway.networking.k8s.io, argoproj.io, keda.sh, apisix.apache.org]
+    resources: ["*"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: { name: argocd-crd-resources, namespace: ecommerce-main }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: argocd-crd-resources }
+subjects:
+  - { apiGroup: rbac.authorization.k8s.io, kind: User, name: __ARGOCD_USER__ }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: { name: argocd-crd-resources, namespace: ingress-apisix }
+rules:
+  - apiGroups: [gateway.networking.k8s.io, argoproj.io, keda.sh, apisix.apache.org]
+    resources: ["*"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: { name: argocd-crd-resources, namespace: ingress-apisix }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: argocd-crd-resources }
+subjects:
+  - { apiGroup: rbac.authorization.k8s.io, kind: User, name: __ARGOCD_USER__ }

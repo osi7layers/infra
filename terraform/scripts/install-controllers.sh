@@ -4,6 +4,7 @@
 #   - Cluster Autoscaler: Pod가 Pending이면 노드 그룹을 min~max 안에서 늘린다 (kube-system/cluster-autoscaler)
 #   - 기본 StorageClass gp3(암호화). EBS CSI 드라이버는 Terraform 애드온이다 (2026-10-22 기준 AWS에서 PVC를 쓰는 앱은 없음)
 #   - 네임스페이스 ecommerce-main(앱), ingress-apisix(APISIX·Ingress). ArgoCD 권한이 이 둘에만 있어서 미리 만든다
+#     액세스 정책에 없는 CRD 리소스(HTTPRoute 등) 권한도 두 네임스페이스에 RBAC로 더한다 (manifests/argocd-rbac.yaml)
 #   - 앱 배포에 필요한 플랫폼 (온프렘과 같은 버전·값, scripts/manifests/): Gateway API·APISIX CRD -> APISIX -> Gateway -> KEDA -> Argo Rollouts
 #     ArgoCD는 네임스페이스 권한만 있어서 CRD와 클러스터 단위 리소스(GatewayClass 등)를 만들 수 없으므로 여기서 설치한다.
 #
@@ -142,6 +143,11 @@ for ns in ecommerce-main ingress-apisix; do
 done
 kubectl label namespace ecommerce-main osi7/gateway=true --overwrite
 kubectl label namespace ingress-apisix elbv2.k8s.aws/pod-readiness-gate-inject=enabled --overwrite
+
+# EKS 액세스 정책(AmazonEKSAdminPolicy)에 없는 CRD 리소스(HTTPRoute, Rollout, ScaledObject, PluginConfig) 권한을 RBAC로 더한다
+step "ArgoCD CRD 리소스 권한 (manifests/argocd-rbac.yaml)"
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text | tr -d '\r')
+sed "s|__ARGOCD_USER__|arn:aws:iam::$ACCOUNT_ID:user/osi7-argocd|" "$MANIFESTS/argocd-rbac.yaml" | kubectl apply -f -
 
 # CRD는 차트에 들어 있는 파일을 그대로 쓴다 (온프렘도 --skip-crds로 설치하고 같은 파일로 CRD를 넣음). 크기가 커서 server-side apply
 step "Gateway API·APISIX CRD (차트 $APISIX_CHART_VERSION 동봉)"
