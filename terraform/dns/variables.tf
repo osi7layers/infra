@@ -51,7 +51,7 @@ variable "acm_hosts" {
 }
 
 variable "onprem_public_ip" {
-  description = "온프레미스 진입 공인 IP (네트워크 담당 제공). acm_hosts의 온프레미스 가중치 레코드와 onprem_hosts 레코드 값. 비우면 만들지 않는다"
+  description = "온프레미스 진입 공인 IP (네트워크 담당 제공). acm_hosts의 온프레미스 가중치 레코드와 onprem_hosts·switch_hosts(onprem) 레코드 값. 비우면 만들지 않는다"
   type        = string
   default     = ""
 
@@ -64,7 +64,29 @@ variable "onprem_public_ip" {
 variable "onprem_hosts" {
   description = "온프레미스에만 있는 호스트 (onprem_public_ip로 단순 A 레코드). 와일드카드도 된다 (예: *.dev -> *.dev.osi7.shop)"
   type        = list(string)
-  default     = ["keycloak", "*.dev"]
+  default     = ["*.dev"]
+}
+
+variable "switch_hosts" {
+  description = "가중치로 나누지 않고 한쪽만 가리키는 호스트 (switch_target 쪽으로 단순 레코드). 로그인 도중 다른 쪽으로 가면 실패하는 Keycloak처럼 한 번에 넘겨야 하는 것"
+  type        = list(string)
+  default     = ["keycloak"]
+}
+
+variable "switch_target" {
+  description = "switch_hosts가 가리킬 쪽. onprem = onprem_public_ip, aws = AWS 쪽 LB (aws_ingress_enabled 필요). 0:100 단계에서만 aws"
+  type        = string
+  default     = "onprem"
+
+  validation {
+    condition     = contains(["onprem", "aws"], var.switch_target)
+    error_message = "onprem 또는 aws만 가능합니다."
+  }
+
+  validation {
+    condition     = var.switch_target == "onprem" || var.aws_ingress_enabled
+    error_message = "switch_target = \"aws\"는 aws_ingress_enabled = true일 때만 쓸 수 있습니다."
+  }
 }
 
 variable "onprem_weight" {

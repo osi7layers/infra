@@ -24,7 +24,13 @@ output "service_records" {
     [for r in aws_route53_record.onprem_weighted : { name = r.name, side = "onprem", weight = var.onprem_weight }],
     [for r in aws_route53_record.aws_weighted : { name = r.name, side = "aws", weight = var.aws_weight }],
     [for r in aws_route53_record.onprem_only : { name = r.name, side = "onprem", weight = null }],
+    [for r in aws_route53_record.switch : { name = r.name, side = var.switch_target, weight = null }],
   )
+}
+
+output "switch_certificate_arn" {
+  description = "switch_hosts(keycloak)용 인증서. Ingress certificate-arn에 acm_certificate_arn과 쉼표로 같이 넣는다"
+  value       = try(aws_acm_certificate_validation.switch[0].certificate_arn, null)
 }
 
 output "aws_lb_dns_name" {
