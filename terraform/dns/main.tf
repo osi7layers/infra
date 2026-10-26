@@ -152,6 +152,40 @@ resource "aws_acm_certificate_validation" "aws_ingress" {
   validation_record_fqdns = [for r in aws_route53_record.acm_validation : r.fqdn]
 }
 
+# switch_hosts(keycloak)용 인증서. 위 인증서에 이름을 더하면 인증서가 새로 만들어져 ARN이 바뀌므로 따로 둔다.
+# Ingress certificate-arn에 쉼표로 같이 적으면 ALB가 접속 이름(SNI)에 맞는 인증서를 고른다
+resource "aws_acm_certificate" "switch" {
+  count = length(var.switch_hosts) > 0 ? 1 : 0
+
+  domain_name               = "${var.switch_hosts[0]}.${var.domain}"
+  subject_alternative_names = [for h in slice(var.switch_hosts, 1, length(var.switch_hosts)) : "${h}.${var.domain}"]
+  validation_method         = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# 키는 이름(switch_hosts)으로 미리 정한다 (인증서가 아직 없으면 검증 값을 몰라 키를 정할 수 없음)
+resource "aws_route53_record" "switch_acm_validation" {
+  for_each = toset([for h in var.switch_hosts : "${h}.${var.domain}"])
+
+  zone_id = data.aws_route53_zone.this.zone_id
+  name    = one([for o in aws_acm_certificate.switch[0].domain_validation_options : o.resource_record_name if o.domain_name == each.key])
+  type    = one([for o in aws_acm_certificate.switch[0].domain_validation_options : o.resource_record_type if o.domain_name == each.key])
+  ttl     = 300
+  records = [one([for o in aws_acm_certificate.switch[0].domain_validation_options : o.resource_record_value if o.domain_name == each.key])]
+
+  allow_overwrite = true
+}
+
+resource "aws_acm_certificate_validation" "switch" {
+  count = length(var.switch_hosts) > 0 ? 1 : 0
+
+  certificate_arn         = aws_acm_certificate.switch[0].arn
+  validation_record_fqdns = [for r in aws_route53_record.switch_acm_validation : r.fqdn]
+}
+
 # ---------------------------------------------------------------- 서비스 레코드 (온프레미스 + AWS 가중치)
 # acm_hosts(shop, api)는 온프레미스와 AWS가 같이 받는다. 같은 이름에 가중치 레코드를 쪽마다 하나씩 두고,
 # 전환 단계(온프레미스:AWS = 100:0 -> 95:5 -> 50:50 -> 0:100)는 onprem_weight / aws_weight만 바꿔 apply한다.
@@ -225,7 +259,7 @@ resource "aws_route53_record" "aws_weighted" {
   }
 }
 
-# keycloak 등 온프레미스에만 있는 호스트
+# OCI 개발 환경(*.dev) 등 온프레미스에만 있는 호스트
 resource "aws_route53_record" "onprem_only" {
   #checkov:skip=CKV2_AWS_23:AWS 리소스가 아니라 온프레미스 진입 공인 IP를 가리키는 레코드
   for_each = local.onprem_enabled ? toset(var.onprem_hosts) : toset([])
@@ -235,4 +269,36 @@ resource "aws_route53_record" "onprem_only" {
   type    = "A"
   ttl     = 300
   records = [var.onprem_public_ip]
+}
+
+# ---------------------------------------------------------------- 한쪽만 가리키는 호스트 (switch_hosts, keycloak)
+# Keycloak은 로그인 도중의 상태가 각 Keycloak 메모리에만 있어서, 가중치로 나누면 화면과 코드 교환이 서로 다른 쪽으로 가
+# 로그인이 실패한다. 그래서 가중치 없이 한쪽만 가리키고, 0:100 단계에서만 AWS로 넘긴다 (weights/*.tfvars의 switch_target).
+# 시나리오상 온프레미스가 꺼진 것으로 보고 DB를 뺀 모든 기능을 AWS에서 처리하기 위한 것이다.
+# 같은 이름 그대로 넘기므로 토큰 발급자(issuer)가 바뀌지 않는다. AWS Keycloak은 온프레미스 Keycloak DB를 같이 써서
+# 사용자·서명 키가 하나다 (양쪽 버전이 같아야 함).
+resource "aws_route53_record" "switch" {
+  #checkov:skip=CKV2_AWS_23:switch_target이 onprem이면 AWS 리소스가 아니라 온프레미스 진입 공인 IP를 가리키는 레코드
+  for_each = (var.switch_target == "aws" || local.onprem_enabled) ? toset(var.switch_hosts) : toset([])
+
+  zone_id = data.aws_route53_zone.this.zone_id
+  name    = "${each.key}.${var.domain}"
+  type    = "A"
+  ttl     = var.switch_target == "onprem" ? 60 : null # 바꾸면 1분 안에 반영되도록 짧게 (alias는 TTL을 쓰지 않음)
+  records = var.switch_target == "onprem" ? [var.onprem_public_ip] : null
+
+  dynamic "alias" {
+    for_each = var.switch_target == "aws" ? [1] : []
+    content {
+      name                   = data.aws_lb.ingress[0].dns_name
+      zone_id                = data.aws_lb.ingress[0].zone_id
+      evaluate_target_health = false # 한쪽뿐이라 빼도 갈 곳이 없다
+    }
+  }
+}
+
+# keycloak은 원래 onprem_hosts에 있었다. 레코드를 지우고 다시 만들지 않게 주소만 옮긴다
+moved {
+  from = aws_route53_record.onprem_only["keycloak"]
+  to   = aws_route53_record.switch["keycloak"]
 }

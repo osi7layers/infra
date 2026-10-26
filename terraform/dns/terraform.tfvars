@@ -19,7 +19,12 @@ acm_hosts = ["shop", "api"]
 onprem_public_ip = "132.145.89.131"
 # 온프레미스에만 있는 호스트. *.dev는 OCI 개발 환경 와일드카드 (shop.dev, api.dev, keycloak.dev 등.
 # web이 화면 주소 맨 앞을 api로 바꿔 API 주소를 정하므로 개발도 shop.dev / api.dev처럼 같은 단계로 맞춤)
-onprem_hosts = ["keycloak", "*.dev"]
+onprem_hosts = ["*.dev"]
+
+# 가중치 없이 한쪽만 가리키는 호스트. 0:100 단계에서만 AWS로 넘긴다 (weights/0-100.tfvars)
+# AWS 쪽 인증서는 따로 만든다 (switch_certificate_arn 출력)
+switch_hosts  = ["keycloak"]
+switch_target = "onprem"
 
 # 가중치 (온프레미스:AWS). 평소 값은 여기, QA 전환 단계는 weights/ 파일로 apply한다
 #   terraform apply -var-file=weights/50-50.tfvars   (롤백: weights/100-0.tfvars)
