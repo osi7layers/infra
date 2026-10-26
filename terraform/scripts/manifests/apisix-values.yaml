@@ -1,0 +1,36 @@
+# APISIX 차트 2.18.2 values (EKS용). install-controllers.sh가 쓴다.
+# 온프렘 osi7-oci/platform/apisix-values.yaml(광렬님, 2026-10-26 받음)과 같고, ALB 뒤라서 달라지는 값만 바꿨다 ("EKS:" 주석).
+# standalone 모드라 etcd가 없다 (Ingress Controller가 설정을 APISIX에 직접 넣음). admin key는 Secret apisix-admin-key(admin, viewer)에서 읽는다.
+useDaemonSet: true
+
+service:
+  # EKS: NodePort(30080/30443) 대신 ClusterIP. ALB가 target-type ip로 Pod 9080에 바로 보낸다 (노드 SG에 NodePort를 열지 않음)
+  type: ClusterIP
+  http: { enabled: true, containerPort: 9080, servicePort: 80 }
+  tls: { servicePort: 443 }
+
+apisix:
+  deployment: { mode: traditional, role: traditional, role_traditional: { config_provider: yaml } }
+  admin:
+    credentials:
+      secretName: apisix-admin-key
+  ssl: { enabled: true }
+  prometheus: { enabled: true }
+  nginx:
+    http:
+      # EKS: ALB가 사용자 IP를 X-Forwarded-For로 보낸다. VPC 대역(ALB)에서 온 헤더만 믿는다 (realIpFrom은 스크립트가 VPC CIDR로 넣음)
+      # 기본값(X-Real-IP, 127.0.0.1)이면 모든 요청이 ALB IP로 보여 IP 기준 rate-limit이 ALB 하나에 걸린다
+      realIpHeader: X-Forwarded-For
+      realIpRecursive: "on"
+
+etcd: { enabled: false }
+
+ingress-controller:
+  enabled: true
+  config:
+    provider: { type: apisix-standalone }
+    listenerPortMatchMode: "off"
+  apisix:
+    adminService: { namespace: ingress-apisix }
+  gatewayProxy: { createDefault: false } # GatewayProxy·GatewayClass·Gateway는 gateway.yaml로 따로 만든다
+  serviceMonitor: { enabled: false }
