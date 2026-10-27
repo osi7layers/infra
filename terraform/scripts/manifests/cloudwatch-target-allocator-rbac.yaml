@@ -1,0 +1,22 @@
+# CloudWatch 에이전트 target allocator 조회 권한 (EKS용). install-controllers.sh가 kubectl apply한다.
+# 앱 지표(eks_app_metrics_enabled)를 켜면 amazon-cloudwatch-observability 애드온이 target allocator를 만들지만,
+# 그 서비스 계정(amazon-cloudwatch/target-allocator-service-acct)의 권한은 만들지 않는다.
+# 권한이 없으면 수집 대상 Pod와 에이전트 Pod를 조회하지 못해 계속 재시작한다 (2026-10-27 확인).
+# 조회(get, list, watch)만 준다. 서비스 계정은 애드온 오퍼레이터가 만들고, 바인딩은 먼저 있어도 된다.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: { name: osi7-cloudwatch-target-allocator }
+rules:
+  - apiGroups: [""]
+    resources: [pods, services, endpoints, nodes, namespaces, configmaps]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: { name: osi7-cloudwatch-target-allocator }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: osi7-cloudwatch-target-allocator }
+subjects:
+  - { kind: ServiceAccount, name: target-allocator-service-acct, namespace: amazon-cloudwatch }
