@@ -27,7 +27,7 @@ onprem_weight = 100
 aws_weight    = 0
 
 # 메인 apply 후 LB Controller가 LB를 만들면 true. 메인 destroy 전에 false로 apply
-aws_ingress_enabled = false
+aws_ingress_enabled = true
 aws_lb_tags         = { "elbv2.k8s.aws/cluster" = "osi7-eks" }
 
 # 온프레미스 상태 검사 경로 (/healthz 200으로 확정). OCI 앱이 올라가 /healthz가 200을 주면 "/healthz"로 바꿔 apply. 비우면 상태 검사 없음
