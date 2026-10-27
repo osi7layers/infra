@@ -394,9 +394,10 @@ locals {
               }
               metric_declaration = [
                 {
-                  source_labels    = ["job"]
-                  label_matcher    = "^ecommerce-app$"
-                  dimensions       = [["ClusterName", "Namespace", "Service", "StatusClass"]]
+                  source_labels = ["job"]
+                  label_matcher = "^ecommerce-app$"
+                  # 두 번째 세트는 product 카나리 비교용. role 라벨이 없는 Pod(Deployment 서비스)는 이 세트를 만들지 않는다
+                  dimensions       = [["ClusterName", "Namespace", "Service", "StatusClass"], ["ClusterName", "Namespace", "Service", "Role", "StatusClass"]]
                   metric_selectors = ["^http_server_requests_seconds_(count|sum)$"]
                 },
                 {
@@ -429,8 +430,7 @@ locals {
             # 서비스 이름: app 라벨, 있으면 app.kubernetes.io/name 라벨 (값이 있을 때만 덮어씀)
             { source_labels = ["__meta_kubernetes_pod_label_app"], regex = "(.+)", target_label = "Service" },
             { source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"], regex = "(.+)", target_label = "Service" },
-            # 버전·역할은 아직 디멘션에 넣지 않고 라벨로만 남긴다 (예찬님 라벨 확인 후 디멘션 추가)
-            { source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_version"], regex = "(.+)", target_label = "Version" },
+            # Argo Rollouts가 붙이는 canary/stable (product만). 버전 라벨은 Pod에 없어 디멘션으로 쓰지 않는다 (10-26 예찬님 확인)
             { source_labels = ["__meta_kubernetes_pod_label_role"], regex = "(.+)", target_label = "Role" },
           ]
           metric_relabel_configs = [

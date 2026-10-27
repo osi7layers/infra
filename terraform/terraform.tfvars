@@ -39,7 +39,7 @@ eks_node_min_size       = 2
 eks_node_max_size       = 4
 
 # 앱 지표 수집 (홍섭님 Grafana용, CloudWatch osi7/App). 사용자 지정 지표 요금이 생기므로 앱이 떠 있을 때만 켠다
-eks_app_metrics_enabled = false
+eks_app_metrics_enabled = true
 
 # 팀원 kubectl 권한. 사용자는 terraform/iam-users가 만들므로 iam-users를 먼저 apply한다.
 # 클러스터 생성자에게 자동으로 관리자를 주지 않으므로 명호도 여기 넣는다.
