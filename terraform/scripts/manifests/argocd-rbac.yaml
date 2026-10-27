@@ -3,6 +3,7 @@
 # CRD 리소스는 포함하지 않는다 (액세스 정책은 수정할 수 없음). 그래서 Kubernetes RBAC로 같은 두 네임스페이스에만 더한다.
 #   gateway.networking.k8s.io: HTTPRoute / argoproj.io: Rollout, AnalysisTemplate (product 카나리)
 #   keda.sh: ScaledObject, TriggerAuthentication / apisix.apache.org: PluginConfig(OIDC) 등
+#   그 밖의 모든 리소스는 조회(get, list, watch)만 연다
 # RoleBinding의 사용자 이름은 Access Entry 기본값인 IAM 사용자 ARN이다. 스크립트가 __ARGOCD_USER__를 계정 ID로 채운다.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -11,6 +12,11 @@ rules:
   - apiGroups: [gateway.networking.k8s.io, argoproj.io, keda.sh, apisix.apache.org]
     resources: ["*"]
     verbs: ["*"]
+  # ArgoCD는 네임스페이스의 모든 리소스 종류를 조회해 캐시를 만든다. 액세스 정책에 없는 종류(podtemplates,
+  # gateway.k8s.aws 등)가 하나라도 forbidden이면 sync가 시작되지 않으므로 조회만 전체로 연다 (10-27)
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: [get, list, watch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -26,6 +32,11 @@ rules:
   - apiGroups: [gateway.networking.k8s.io, argoproj.io, keda.sh, apisix.apache.org]
     resources: ["*"]
     verbs: ["*"]
+  # ArgoCD는 네임스페이스의 모든 리소스 종류를 조회해 캐시를 만든다. 액세스 정책에 없는 종류(podtemplates,
+  # gateway.k8s.aws 등)가 하나라도 forbidden이면 sync가 시작되지 않으므로 조회만 전체로 연다 (10-27)
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: [get, list, watch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
