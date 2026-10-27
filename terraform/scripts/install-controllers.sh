@@ -151,6 +151,10 @@ step "ArgoCD CRD 리소스 권한 (manifests/argocd-rbac.yaml)"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text | tr -d '\r')
 sed "s|__ARGOCD_USER__|arn:aws:iam::$ACCOUNT_ID:user/osi7-argocd|" "$MANIFESTS/argocd-rbac.yaml" | kubectl apply -f -
 
+# 앱 지표(eks_app_metrics_enabled)용 target allocator 조회 권한. 애드온이 만들지 않아서 없으면 계속 재시작한다
+step "CloudWatch target allocator 조회 권한 (manifests/cloudwatch-target-allocator-rbac.yaml)"
+kubectl apply -f "$MANIFESTS/cloudwatch-target-allocator-rbac.yaml"
+
 # CRD는 차트에 들어 있는 파일을 그대로 쓴다 (온프렘도 --skip-crds로 설치하고 같은 파일로 CRD를 넣음). 크기가 커서 server-side apply
 step "Gateway API·APISIX CRD (차트 $APISIX_CHART_VERSION 동봉)"
 CHART_TMP=$(mktemp -d)
