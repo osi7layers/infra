@@ -5,7 +5,7 @@
 #   - 기본 StorageClass gp3(암호화). EBS CSI 드라이버는 Terraform 애드온이다 (2026-10-22 기준 AWS에서 PVC를 쓰는 앱은 없음)
 #   - 네임스페이스 ecommerce-main(앱), ingress-apisix(APISIX·Ingress). ArgoCD 권한이 이 둘에만 있어서 미리 만든다
 #     액세스 정책에 없는 CRD 리소스(HTTPRoute 등) 권한도 두 네임스페이스에 RBAC로 더한다 (manifests/argocd-rbac.yaml)
-#   - 앱 배포에 필요한 플랫폼 (온프렘과 같은 버전·값, scripts/manifests/): Gateway API·APISIX CRD -> APISIX -> Gateway -> KEDA -> Argo Rollouts
+#   - 앱 배포에 필요한 플랫폼 (온프렘과 같은 버전·값, scripts/manifests/): Gateway API·APISIX CRD -> APISIX -> Gateway -> KEDA -> Argo Rollouts -> metrics-server
 #     ArgoCD는 네임스페이스 권한만 있어서 CRD와 클러스터 단위 리소스(GatewayClass 등)를 만들 수 없으므로 여기서 설치한다.
 #
 # 사용법 (terraform 폴더에서, Git Bash):
@@ -28,6 +28,7 @@ CA_IMAGE_TAG="v1.36.1"     # Cluster Autoscaler는 쿠버네티스 마이너 버
 APISIX_CHART_VERSION="2.18.2"   # APISIX 3.19.0, Ingress Controller 2.2.0. Gateway API CRD v1.6.0 standard가 차트에 들어 있다
 KEDA_CHART_VERSION="2.21.0"
 ROLLOUTS_CHART_VERSION="2.43.6" # 이미지 v1.10.1, Gateway API 플러그인 v0.17.0 (manifests/argo-rollouts-values.yaml)
+METRICS_SERVER_VERSION="v0.9.0" # 공식 components.yaml 그대로 (예찬님 10-27 설치와 같음). HPA·KEDA CPU 기준, kubectl top에 필요
 REGION="${AWS_REGION:-ap-northeast-2}"
 MANIFESTS="scripts/manifests"
 
@@ -59,6 +60,7 @@ status() {
   kubectl get pods -n ingress-apisix -o wide 2>/dev/null
   kubectl get pods -n keda 2>/dev/null
   kubectl get pods -n argo-rollouts 2>/dev/null
+  kubectl -n kube-system get deploy metrics-server 2>/dev/null
   step "Gateway (PROGRAMMED가 True여야 HTTPRoute가 붙는다)"
   kubectl get gatewayclass,gateway -A 2>/dev/null || echo "(Gateway API CRD 없음)"
   step "네임스페이스 라벨"
@@ -195,6 +197,11 @@ helm upgrade --install argo-rollouts argo/argo-rollouts \
   --namespace argo-rollouts --create-namespace --version "$ROLLOUTS_CHART_VERSION" \
   -f "$MANIFESTS/argo-rollouts-values.yaml" \
   --wait --timeout 5m
+
+# EKS에는 metrics-server가 기본으로 없다. HPA(CPU)와 KEDA cpu 트리거가 이 지표를 쓴다
+step "metrics-server $METRICS_SERVER_VERSION"
+kubectl apply -f "https://github.com/kubernetes-sigs/metrics-server/releases/download/$METRICS_SERVER_VERSION/components.yaml"
+kubectl -n kube-system rollout status deploy/metrics-server --timeout=3m
 
 status
 echo
