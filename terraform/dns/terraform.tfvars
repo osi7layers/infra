@@ -30,7 +30,8 @@ aws_weight    = 0
 aws_ingress_enabled = true
 aws_lb_tags         = { "elbv2.k8s.aws/cluster" = "osi7-eks" }
 
-# 온프레미스 상태 검사 경로 (/healthz 200으로 확정). OCI 앱이 올라가 /healthz가 200을 주면 "/healthz"로 바꿔 apply. 비우면 상태 검사 없음
+# 온프레미스 상태 검사 경로. 쓰지 않기로 함 (2026-10-28): 전환·롤백은 가중치 apply로 수동, 온프레미스 장애 시 자동 failover는 범위 밖.
+# 다시 쓰려면 OCI가 200을 주는 경로(예: "/healthz")를 넣고 apply. 비우면 상태 검사 없음
 onprem_health_check_path = ""
 # 상태 검사 간격(초, 30 또는 10)과 실패 횟수. 감지 시간은 대략 간격 x 횟수 (QA 간격별 비교용)
 onprem_health_check_interval          = 30
