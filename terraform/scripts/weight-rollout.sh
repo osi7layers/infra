@@ -1,24 +1,25 @@
 #!/usr/bin/env bash
-# QA 가중치 전환을 정해진 간격으로 자동 진행한다 (온프레미스:AWS = 80:20 -> 50:50 -> 20:80 -> 0:100).
+# QA 가중치 전환을 정해진 간격으로 자동 진행한다 (온프레미스:AWS = 100:0 -> 80:20 -> 50:50 -> 20:80 -> 0:100).
+# 첫 단계 100:0은 기준 구간이고, 마지막 0:100도 한 간격을 기다린 뒤 끝나서 단계마다 시작·끝 시각이 로그에 남는다.
 # 단계마다 terraform/dns에서 weights/<단계>.tfvars로 apply(-auto-approve)하고, 적용 시각을 로그에 남긴 뒤 기다린다.
 # 롤백(100:0)은 자동으로 하지 않는다. 멈추거나 되돌릴 때는 Ctrl+C로 중단하고 직접 apply한다:
 #   cd terraform/dns && terraform apply -var-file=weights/100-0.tfvars
 #
 # 사용법 (terraform 폴더에서, Git Bash):
-#   ./scripts/weight-rollout.sh               # 80-20부터 10분 간격
+#   ./scripts/weight-rollout.sh               # 100-0부터 10분 간격
 #   ./scripts/weight-rollout.sh 50-50         # 중간 단계부터 다시 시작 (중단 후 재개용)
 #   INTERVAL_MIN=15 ./scripts/weight-rollout.sh
 #
 # 주의
 #   - 가중치는 apply 후 DNS TTL(60초) 동안 이전 비율과 섞인다. 비율을 잴 때는 각 단계의 첫 1분을 빼고 본다.
 #   - 문제가 있어도 다음 단계로 넘어간다. 대시보드를 보다가 롤백 기준에 걸리면 Ctrl+C 후 100-0을 apply한다.
-#   - 전체 약 30분 + apply 시간. aws login 세션이 중간에 만료되지 않도록 시작 직전에 다시 로그인하고, PC가 잠자기에 들어가지 않게 한다.
+#   - 전체 약 50분(5단계 × 간격) + apply 시간. aws login 세션이 중간에 만료되지 않도록 시작 직전에 다시 로그인하고, PC가 잠자기에 들어가지 않게 한다.
 set -euo pipefail
 cd "$(dirname "$0")/../dns"
 
-STEPS=(80-20 50-50 20-80 0-100)
+STEPS=(100-0 80-20 50-50 20-80 0-100)
 INTERVAL_MIN="${INTERVAL_MIN:-10}"
-START="${1:-80-20}"
+START="${1:-100-0}"
 LOG_DIR="logs"
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/weight-rollout-$(date +%Y%m%d-%H%M%S).log"
@@ -54,8 +55,10 @@ for ((i = idx; i < ${#STEPS[@]}; i++)); do
   if ((i < ${#STEPS[@]} - 1)); then
     next="${STEPS[$((i + 1))]}"
     log "${INTERVAL_MIN}분 대기 후 ${next/-/:}"
-    sleep $((INTERVAL_MIN * 60))
+  else
+    log "${INTERVAL_MIN}분 대기 후 종료 (마지막 단계 관찰 구간)"
   fi
+  sleep $((INTERVAL_MIN * 60))
 done
 
-log "마지막 단계(${current/-/:}) 적용 완료. 롤백은 직접: terraform apply -var-file=weights/100-0.tfvars"
+log "마지막 단계(${current/-/:}) 관찰 종료. 비율은 그대로 남는다. 롤백은 직접: terraform apply -var-file=weights/100-0.tfvars"
