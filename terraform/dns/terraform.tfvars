@@ -27,7 +27,7 @@ onprem_weight = 100
 aws_weight    = 0
 
 # 메인 apply 후 LB Controller가 LB를 만들면 true. 메인 destroy 전에 false로 apply
-aws_ingress_enabled = true
+aws_ingress_enabled = false
 aws_lb_tags         = { "elbv2.k8s.aws/cluster" = "osi7-eks" }
 
 # 온프레미스 상태 검사 경로. 쓰지 않기로 함 (2026-10-28): 전환·롤백은 가중치 apply로 수동, 온프레미스 장애 시 자동 failover는 범위 밖.
