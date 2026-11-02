@@ -133,7 +133,7 @@ resource "aws_iam_group_policy_attachment" "cli_login" {
 # 자기 자격 증명 관리 정책(self-mfa)이 붙지 않게 하려고다. 액세스 키는 콘솔에서 발급해 각 담당에게 전달한다.
 locals {
   service_users = {
-    jenkins = { user = "${var.project}-jenkins-ecr-push", policy = "ecr-push" } # ECR push (Harbor와 이중 push)
+    jenkins = { user = "${var.project}-jenkins-ecr-push", policy = "ecr-push" } # Harbor -> ECR 복제용 push (이름은 Jenkins 이중 push 시절 그대로)
     argocd  = { user = "${var.project}-argocd", policy = "eks-read" }           # EKS 원격 관리. kubectl 권한은 메인의 Access Entry
     grafana = { user = "${var.project}-grafana", policy = "grafana-assume" }    # 온프레미스 Grafana CloudWatch 데이터 소스. 조회는 역할로
   }
@@ -219,7 +219,7 @@ data "aws_iam_policy_document" "eks_read" {
   }
 }
 
-# 지은(cicd 그룹)과 Jenkins: 프로젝트 리포지토리에만 push/pull. 로그인 토큰 발급(GetAuthorizationToken)은 AWS 구조상 리소스를 좁힐 수 없다
+# 지은(cicd 그룹)과 Harbor 복제(jenkins-ecr-push 사용자): 프로젝트 리포지토리에만 push/pull. 로그인 토큰 발급(GetAuthorizationToken)은 AWS 구조상 리소스를 좁힐 수 없다
 data "aws_iam_policy_document" "ecr_push" {
   statement {
     sid       = "EcrLogin"
